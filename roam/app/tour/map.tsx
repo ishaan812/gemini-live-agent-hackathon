@@ -1,0 +1,166 @@
+import React from 'react'
+import { StyleSheet, Text, TouchableOpacity, View } from 'react-native'
+import { useRouter } from 'expo-router'
+import { TourMapView } from '../../components/MapView'
+import { StopCard } from '../../components/StopCard'
+import { useLocation } from '../../hooks/useLocation'
+import { useTour } from '../../hooks/useTour'
+import { isWithinThreshold, getDistanceMeters } from '../../utils/distance'
+import { Colors, Fonts } from '../../constants/colors'
+import { Config } from '../../constants/config'
+
+export default function MapScreen() {
+  const router = useRouter()
+  const location = useLocation()
+  const { stops, currentStop, currentStopIndex, completedStops } = useTour()
+
+  const isNearStop =
+    currentStop && !location.loading
+      ? isWithinThreshold(
+          location.latitude,
+          location.longitude,
+          currentStop.latitude,
+          currentStop.longitude,
+          Config.ARRIVAL_THRESHOLD_METERS,
+        )
+      : false
+
+  const distanceToStop =
+    currentStop && !location.loading
+      ? Math.round(
+          getDistanceMeters(
+            location.latitude,
+            location.longitude,
+            currentStop.latitude,
+            currentStop.longitude,
+          ),
+        )
+      : null
+
+  const handleDevSkip = () => {
+    router.push('/tour/camera')
+  }
+
+  return (
+    <View style={styles.container}>
+      <View style={styles.mapContainer}>
+        {!location.loading && (
+          <TourMapView
+            stops={stops}
+            currentStopIndex={currentStopIndex}
+            completedStops={completedStops}
+            userLatitude={location.latitude}
+            userLongitude={location.longitude}
+          />
+        )}
+        {location.loading && (
+          <View style={styles.loadingContainer}>
+            <Text style={styles.loadingText}>Getting your location...</Text>
+          </View>
+        )}
+      </View>
+
+      {__DEV__ && !isNearStop && currentStop && (
+        <TouchableOpacity
+          style={styles.devSkipButton}
+          onPress={handleDevSkip}
+        >
+          <Text style={styles.devSkipText}>Skip (Dev)</Text>
+        </TouchableOpacity>
+      )}
+
+      <View style={styles.bottomSheet}>
+        {currentStop && (
+          <>
+            <StopCard
+              stop={currentStop}
+              isActive={true}
+              isCompleted={completedStops.includes(currentStop.id)}
+              distance={
+                distanceToStop !== null ? `${distanceToStop}m away` : undefined
+              }
+            />
+            {isNearStop && (
+              <TouchableOpacity
+                style={styles.verifyButton}
+                onPress={() => router.push('/tour/camera')}
+              >
+                <Text style={styles.verifyButtonText}>Verify Checkpoint</Text>
+              </TouchableOpacity>
+            )}
+            {!isNearStop && distanceToStop !== null && (
+              <Text style={styles.walkText}>
+                Walk to {currentStop.name} to continue
+              </Text>
+            )}
+          </>
+        )}
+      </View>
+    </View>
+  )
+}
+
+const styles = StyleSheet.create({
+  container: {
+    flex: 1,
+    backgroundColor: Colors.background,
+  },
+  mapContainer: {
+    flex: 1,
+  },
+  loadingContainer: {
+    flex: 1,
+    justifyContent: 'center',
+    alignItems: 'center',
+    backgroundColor: Colors.background,
+  },
+  loadingText: {
+    fontSize: 16,
+    fontFamily: Fonts.regular,
+    color: Colors.textSecondary,
+  },
+  bottomSheet: {
+    backgroundColor: Colors.primaryLight,
+    paddingVertical: 16,
+    borderTopLeftRadius: 20,
+    borderTopRightRadius: 20,
+    borderTopWidth: 1,
+    borderTopColor: Colors.border,
+  },
+  verifyButton: {
+    backgroundColor: Colors.accent,
+    marginHorizontal: 16,
+    paddingVertical: 14,
+    borderRadius: 14,
+    alignItems: 'center',
+    marginTop: 8,
+  },
+  verifyButtonText: {
+    color: '#000',
+    fontSize: 16,
+    fontFamily: Fonts.bold,
+  },
+  walkText: {
+    textAlign: 'center',
+    fontFamily: Fonts.regular,
+    color: Colors.textSecondary,
+    fontSize: 14,
+    marginTop: 8,
+    paddingBottom: 8,
+  },
+  devSkipButton: {
+    position: 'absolute',
+    top: 60,
+    right: 16,
+    backgroundColor: '#FF6B00',
+    paddingHorizontal: 14,
+    paddingVertical: 8,
+    borderRadius: 20,
+    zIndex: 999,
+  },
+  devSkipText: {
+    color: '#fff',
+    fontSize: 13,
+    fontFamily: Fonts.bold,
+  },
+})
