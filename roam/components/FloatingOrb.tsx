@@ -16,13 +16,6 @@ const MODE_COLOR: Record<OrbMode, string> = {
   conversing: '#9B59B6',
 }
 
-const MODE_EMOJI: Record<OrbMode, string> = {
-  idle: '\u{1F50A}',       // speaker
-  narrating: '\u{1F50A}',  // speaker
-  paused: '\u{1F3A4}',     // mic
-  conversing: '\u2728',    // sparkles
-}
-
 const MODE_LABEL: Record<OrbMode, string> = {
   idle: 'Tap to play',
   narrating: 'Tap to ask a question',
@@ -32,14 +25,25 @@ const MODE_LABEL: Record<OrbMode, string> = {
 
 export function FloatingOrb({ mode, onPress }: Props) {
   const pulseAnim = useRef(new Animated.Value(1)).current
-  const glowAnim = useRef(new Animated.Value(0.3)).current
+  const glowAnim = useRef(new Animated.Value(0.15)).current
   const rotateAnim = useRef(new Animated.Value(0)).current
+  const ring2Rotate = useRef(new Animated.Value(0)).current
+  const breatheAnim = useRef(new Animated.Value(1)).current
 
+  // Continuous rotation for outer rings
   useEffect(() => {
     Animated.loop(
       Animated.timing(rotateAnim, {
         toValue: 1,
-        duration: 8000,
+        duration: 10000,
+        easing: Easing.linear,
+        useNativeDriver: true,
+      }),
+    ).start()
+    Animated.loop(
+      Animated.timing(ring2Rotate, {
+        toValue: 1,
+        duration: 14000,
         easing: Easing.linear,
         useNativeDriver: true,
       }),
@@ -49,19 +53,21 @@ export function FloatingOrb({ mode, onPress }: Props) {
   useEffect(() => {
     pulseAnim.stopAnimation()
     glowAnim.stopAnimation()
+    breatheAnim.stopAnimation()
 
     if (mode === 'narrating') {
+      // Active, organic pulsing — the orb "breathes" with the narration
       Animated.loop(
         Animated.sequence([
           Animated.timing(pulseAnim, {
-            toValue: 1.12,
-            duration: 500,
+            toValue: 1.14,
+            duration: 600,
             easing: Easing.inOut(Easing.ease),
             useNativeDriver: true,
           }),
           Animated.timing(pulseAnim, {
-            toValue: 0.94,
-            duration: 500,
+            toValue: 0.92,
+            duration: 600,
             easing: Easing.inOut(Easing.ease),
             useNativeDriver: true,
           }),
@@ -70,51 +76,76 @@ export function FloatingOrb({ mode, onPress }: Props) {
       Animated.loop(
         Animated.sequence([
           Animated.timing(glowAnim, {
-            toValue: 0.7,
-            duration: 700,
+            toValue: 0.6,
+            duration: 800,
+            easing: Easing.inOut(Easing.ease),
             useNativeDriver: true,
           }),
           Animated.timing(glowAnim, {
-            toValue: 0.25,
-            duration: 700,
+            toValue: 0.15,
+            duration: 800,
+            easing: Easing.inOut(Easing.ease),
+            useNativeDriver: true,
+          }),
+        ]),
+      ).start()
+      Animated.loop(
+        Animated.sequence([
+          Animated.timing(breatheAnim, {
+            toValue: 1.08,
+            duration: 1200,
+            easing: Easing.inOut(Easing.ease),
+            useNativeDriver: true,
+          }),
+          Animated.timing(breatheAnim, {
+            toValue: 0.96,
+            duration: 1200,
+            easing: Easing.inOut(Easing.ease),
             useNativeDriver: true,
           }),
         ]),
       ).start()
     } else if (mode === 'paused') {
+      // Gentle waiting pulse
       Animated.loop(
         Animated.sequence([
           Animated.timing(pulseAnim, {
-            toValue: 1.06,
-            duration: 900,
+            toValue: 1.05,
+            duration: 1000,
             easing: Easing.inOut(Easing.ease),
             useNativeDriver: true,
           }),
           Animated.timing(pulseAnim, {
-            toValue: 0.96,
-            duration: 900,
+            toValue: 0.97,
+            duration: 1000,
             easing: Easing.inOut(Easing.ease),
             useNativeDriver: true,
           }),
         ]),
       ).start()
       Animated.timing(glowAnim, {
-        toValue: 0.55,
-        duration: 400,
+        toValue: 0.45,
+        duration: 500,
+        useNativeDriver: true,
+      }).start()
+      Animated.timing(breatheAnim, {
+        toValue: 1,
+        duration: 300,
         useNativeDriver: true,
       }).start()
     } else if (mode === 'conversing') {
+      // Intense, fast pulsing — orb is "alive" and reacting
       Animated.loop(
         Animated.sequence([
           Animated.timing(pulseAnim, {
-            toValue: 1.18,
-            duration: 350,
+            toValue: 1.2,
+            duration: 300,
             easing: Easing.inOut(Easing.ease),
             useNativeDriver: true,
           }),
           Animated.timing(pulseAnim, {
-            toValue: 0.88,
-            duration: 350,
+            toValue: 0.85,
+            duration: 300,
             easing: Easing.inOut(Easing.ease),
             useNativeDriver: true,
           }),
@@ -123,34 +154,73 @@ export function FloatingOrb({ mode, onPress }: Props) {
       Animated.loop(
         Animated.sequence([
           Animated.timing(glowAnim, {
-            toValue: 0.8,
-            duration: 400,
+            toValue: 0.85,
+            duration: 350,
+            easing: Easing.inOut(Easing.ease),
             useNativeDriver: true,
           }),
           Animated.timing(glowAnim, {
-            toValue: 0.2,
-            duration: 400,
+            toValue: 0.1,
+            duration: 350,
+            easing: Easing.inOut(Easing.ease),
+            useNativeDriver: true,
+          }),
+        ]),
+      ).start()
+      Animated.loop(
+        Animated.sequence([
+          Animated.timing(breatheAnim, {
+            toValue: 1.12,
+            duration: 500,
+            easing: Easing.inOut(Easing.ease),
+            useNativeDriver: true,
+          }),
+          Animated.timing(breatheAnim, {
+            toValue: 0.92,
+            duration: 500,
+            easing: Easing.inOut(Easing.ease),
             useNativeDriver: true,
           }),
         ]),
       ).start()
     } else {
+      // Idle — slow, ambient breathing
       Animated.timing(pulseAnim, {
         toValue: 1,
-        duration: 300,
+        duration: 400,
         useNativeDriver: true,
       }).start()
       Animated.timing(glowAnim, {
-        toValue: 0.3,
-        duration: 300,
+        toValue: 0.15,
+        duration: 400,
         useNativeDriver: true,
       }).start()
+      Animated.loop(
+        Animated.sequence([
+          Animated.timing(breatheAnim, {
+            toValue: 1.03,
+            duration: 2000,
+            easing: Easing.inOut(Easing.ease),
+            useNativeDriver: true,
+          }),
+          Animated.timing(breatheAnim, {
+            toValue: 0.98,
+            duration: 2000,
+            easing: Easing.inOut(Easing.ease),
+            useNativeDriver: true,
+          }),
+        ]),
+      ).start()
     }
   }, [mode])
 
   const rotation = rotateAnim.interpolate({
     inputRange: [0, 1],
     outputRange: ['0deg', '360deg'],
+  })
+  const rotation2 = ring2Rotate.interpolate({
+    inputRange: [0, 1],
+    outputRange: ['360deg', '0deg'],
   })
 
   const color = MODE_COLOR[mode]
@@ -162,6 +232,18 @@ export function FloatingOrb({ mode, onPress }: Props) {
         onPress={onPress}
         activeOpacity={0.7}
       >
+        {/* Outermost ambient glow — large, soft, ominous */}
+        <Animated.View
+          style={[
+            styles.ambientGlow,
+            {
+              backgroundColor: color,
+              opacity: glowAnim,
+              transform: [{ scale: breatheAnim }],
+            },
+          ]}
+        />
+
         {/* Outer rotating dashed ring */}
         <Animated.View
           style={[
@@ -173,28 +255,44 @@ export function FloatingOrb({ mode, onPress }: Props) {
             },
           ]}
         />
-        {/* Middle glow */}
+
+        {/* Second ring — counter-rotating, dotted */}
+        <Animated.View
+          style={[
+            styles.ringSecond,
+            {
+              transform: [{ rotate: rotation2 }],
+              borderColor: color,
+              opacity: Animated.multiply(glowAnim, 0.6),
+            },
+          ]}
+        />
+
+        {/* Middle glow layer */}
         <Animated.View
           style={[
             styles.ringMiddle,
             {
               backgroundColor: color,
-              opacity: glowAnim,
+              opacity: Animated.multiply(glowAnim, 0.8),
               transform: [{ scale: pulseAnim }],
             },
           ]}
         />
-        {/* Inner orb */}
+
+        {/* Inner core orb */}
         <Animated.View
           style={[
-            styles.orbInner,
+            styles.orbCore,
             {
               backgroundColor: color,
               transform: [{ scale: pulseAnim }],
+              shadowColor: color,
             },
           ]}
         >
-          <Text style={styles.emoji}>{MODE_EMOJI[mode]}</Text>
+          {/* Bright center highlight */}
+          <View style={styles.orbHighlight} />
         </Animated.View>
       </TouchableOpacity>
       <Text style={styles.label}>{MODE_LABEL[mode]}</Text>
@@ -208,44 +306,62 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
   },
   container: {
-    width: 160,
-    height: 160,
+    width: 180,
+    height: 180,
     alignItems: 'center',
     justifyContent: 'center',
+  },
+  ambientGlow: {
+    position: 'absolute',
+    width: 200,
+    height: 200,
+    borderRadius: 100,
   },
   ringOuter: {
     position: 'absolute',
-    width: 160,
-    height: 160,
-    borderRadius: 80,
-    borderWidth: 2,
+    width: 170,
+    height: 170,
+    borderRadius: 85,
+    borderWidth: 1.5,
     borderStyle: 'dashed',
+  },
+  ringSecond: {
+    position: 'absolute',
+    width: 150,
+    height: 150,
+    borderRadius: 75,
+    borderWidth: 1,
+    borderStyle: 'dotted',
   },
   ringMiddle: {
     position: 'absolute',
-    width: 130,
-    height: 130,
-    borderRadius: 65,
+    width: 120,
+    height: 120,
+    borderRadius: 60,
   },
-  orbInner: {
-    width: 100,
-    height: 100,
-    borderRadius: 50,
+  orbCore: {
+    width: 90,
+    height: 90,
+    borderRadius: 45,
     justifyContent: 'center',
     alignItems: 'center',
-    shadowColor: Colors.accent,
     shadowOffset: { width: 0, height: 0 },
-    shadowOpacity: 0.5,
-    shadowRadius: 20,
-    elevation: 10,
+    shadowOpacity: 0.8,
+    shadowRadius: 30,
+    elevation: 15,
   },
-  emoji: {
-    fontSize: 36,
+  orbHighlight: {
+    width: 36,
+    height: 36,
+    borderRadius: 18,
+    backgroundColor: 'rgba(255, 255, 255, 0.25)',
+    marginTop: -12,
+    marginLeft: -8,
   },
   label: {
     fontSize: 14,
     color: Colors.textSecondary,
-    marginTop: 16,
+    marginTop: 20,
     fontFamily: 'Poppins_400Regular',
   },
 })

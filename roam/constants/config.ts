@@ -1,5 +1,6 @@
 export const Config = {
   API_URL: process.env.EXPO_PUBLIC_API_URL || 'http://localhost:3000',
+  SERVER_URL: process.env.EXPO_PUBLIC_SERVER_URL || 'http://192.168.1.155:3001',
   GEMINI_API_KEY: 'AQ.Ab8RN6KW7-39bkfbrgOP8YLu-T6ni6XZV94xxenmVhDIKONChg',
   ARRIVAL_THRESHOLD_METERS: 50,
   DEFAULT_TOUR_ID: 'colaba-heritage-walk',

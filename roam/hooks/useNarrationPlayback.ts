@@ -6,13 +6,14 @@ import {
 } from 'expo-audio'
 import { aiAlpha, LIVE_MODEL, LIVE_SPEECH_CONFIG } from '../services/geminiService'
 import { Modality } from '@google/genai'
-import { writePcmToTempWav } from '../utils/audio'
+import { writeChunksToTempWav } from '../utils/audio'
 import { splitWords } from '../utils/wordSync'
 import { useUserStore } from '../store/userStore'
 
 export type NarrationStatus = 'idle' | 'loading' | 'playing' | 'paused'
 
-const AUDIO_FLUSH_INTERVAL = 300
+// Larger buffers = fewer file transitions = smoother audio with less gapping
+const AUDIO_FLUSH_INTERVAL = 500
 
 const STYLE_MAP: Record<string, string> = {
   historical: 'scholarly and historically rich with dates and facts',
@@ -103,10 +104,14 @@ export function useNarrationPlayback() {
       // Clean up previous player
       try { playerRef.current?.pause() } catch {}
 
-      const newPlayer = createAudioPlayer({ uri: fileUri })
-      newPlayer.addListener('playbackStatusUpdate', (status) => {
-        if (status.playing === false && isMountedRef.current) {
-          // Play next chunk when current one finishes
+      const newPlayer = createAudioPlayer(fileUri)
+      let didStartPlaying = false
+      newPlayer.addListener('playbackStatusUpdate', (s) => {
+        if (s.playing === true) {
+          didStartPlaying = true
+        }
+        if (didStartPlaying && s.playing === false && isMountedRef.current) {
+          didStartPlaying = false
           playNextInQueue()
         }
       })
@@ -122,11 +127,12 @@ export function useNarrationPlayback() {
   function flushAudioChunks() {
     if (audioChunksRef.current.length === 0) return
 
-    const combined = audioChunksRef.current.join('')
+    const chunks = [...audioChunksRef.current]
     audioChunksRef.current = []
 
     try {
-      const fileUri = writePcmToTempWav(combined, 24000)
+      // Decode each base64 chunk individually to avoid padding corruption
+      const fileUri = writeChunksToTempWav(chunks, 24000)
       audioQueueRef.current.push(fileUri)
       totalAudioChunksReceivedRef.current += 1
 

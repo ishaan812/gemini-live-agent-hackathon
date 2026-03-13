@@ -6,7 +6,7 @@ import { useUserStore } from '../store/userStore'
 // Standard client for text generation
 export const ai = new GoogleGenAI({ apiKey: Config.GEMINI_API_KEY })
 
-// v1alpha client for affective dialog & proactive audio
+// v1alpha client — still used for narration audio (TTS via Live API)
 export const aiAlpha = new GoogleGenAI({
   apiKey: Config.GEMINI_API_KEY,
   apiVersion: 'v1alpha',
@@ -14,24 +14,13 @@ export const aiAlpha = new GoogleGenAI({
 
 const MODEL = 'gemini-2.5-flash'
 export const LIVE_MODEL = 'gemini-2.5-flash-native-audio-preview-12-2025'
-const TTS_MODEL = 'gemini-2.5-flash-preview-tts'
 
-// Woman's voice - Aoede is breezy & expressive
 export const VOICE_NAME = 'Aoede'
 
 export const LIVE_SPEECH_CONFIG = {
   voiceConfig: {
     prebuiltVoiceConfig: { voiceName: VOICE_NAME },
   },
-}
-
-export const LIVE_CONFIG = {
-  responseModalities: [Modality.AUDIO],
-  speechConfig: LIVE_SPEECH_CONFIG,
-  enableAffectiveDialog: true,
-  proactivity: { proactiveAudio: true },
-  inputAudioTranscription: {},
-  outputAudioTranscription: {},
 }
 
 const LANG_MAP: Record<string, string> = {
@@ -196,9 +185,12 @@ BEHAVIOR:
 - Proactively share fascinating details — don't wait to be asked about everything
 - When there's a lull, offer an interesting tidbit: "Oh! And did you know..."
 - Paint sensory pictures: describe the sounds, smells, the feel of the place
-- Keep responses conversational and natural — 2-3 sentences at a time, not lectures
+- Match your response length to the context — a simple question gets a warm focused answer, a deep question gets a rich exploration. Never cut yourself short when there's more to share, but don't pad either. The tourist is here to LEARN and be MOVED, not get a Wikipedia summary
+- Layer your responses: start with the immediate answer, then add historical context, then a surprising detail or personal anecdote. Make every detail feel alive and glowing with significance
 - If the tourist seems lost or confused, gently guide them
 - Share personal-feeling anecdotes: "My favorite thing about this place is..."
+- When asked a question, don't just answer it — weave in related stories, legends, and cultural significance. Connect the dots between past and present
+- At the end of your responses, naturally suggest other interesting things nearby — hidden gems, street food spots, lesser-known viewpoints, or cultural experiences the tourist shouldn't miss while they're in the area
 
 CONTEXT:
 ${stop.description}

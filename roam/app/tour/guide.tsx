@@ -24,15 +24,24 @@ interface Transcript {
 
 function VoiceOrb({ status }: { status: LiveStatus }) {
   const pulseAnim = useRef(new Animated.Value(1)).current
-  const glowAnim = useRef(new Animated.Value(0.3)).current
+  const glowAnim = useRef(new Animated.Value(0.15)).current
   const rotateAnim = useRef(new Animated.Value(0)).current
+  const ring2Rotate = useRef(new Animated.Value(0)).current
+  const breatheAnim = useRef(new Animated.Value(1)).current
 
   useEffect(() => {
-    // Continuous rotation for the outer ring
     Animated.loop(
       Animated.timing(rotateAnim, {
         toValue: 1,
-        duration: 8000,
+        duration: 10000,
+        easing: Easing.linear,
+        useNativeDriver: true,
+      }),
+    ).start()
+    Animated.loop(
+      Animated.timing(ring2Rotate, {
+        toValue: 1,
+        duration: 14000,
         easing: Easing.linear,
         useNativeDriver: true,
       }),
@@ -40,18 +49,21 @@ function VoiceOrb({ status }: { status: LiveStatus }) {
   }, [])
 
   useEffect(() => {
+    pulseAnim.stopAnimation()
+    glowAnim.stopAnimation()
+    breatheAnim.stopAnimation()
+
     if (status === 'speaking') {
-      // Active pulsing when speaking
       Animated.loop(
         Animated.sequence([
           Animated.timing(pulseAnim, {
-            toValue: 1.15,
+            toValue: 1.18,
             duration: 400,
             easing: Easing.inOut(Easing.ease),
             useNativeDriver: true,
           }),
           Animated.timing(pulseAnim, {
-            toValue: 0.95,
+            toValue: 0.88,
             duration: 400,
             easing: Easing.inOut(Easing.ease),
             useNativeDriver: true,
@@ -61,19 +73,36 @@ function VoiceOrb({ status }: { status: LiveStatus }) {
       Animated.loop(
         Animated.sequence([
           Animated.timing(glowAnim, {
-            toValue: 0.8,
+            toValue: 0.7,
             duration: 600,
+            easing: Easing.inOut(Easing.ease),
             useNativeDriver: true,
           }),
           Animated.timing(glowAnim, {
-            toValue: 0.3,
+            toValue: 0.12,
             duration: 600,
+            easing: Easing.inOut(Easing.ease),
+            useNativeDriver: true,
+          }),
+        ]),
+      ).start()
+      Animated.loop(
+        Animated.sequence([
+          Animated.timing(breatheAnim, {
+            toValue: 1.1,
+            duration: 800,
+            easing: Easing.inOut(Easing.ease),
+            useNativeDriver: true,
+          }),
+          Animated.timing(breatheAnim, {
+            toValue: 0.94,
+            duration: 800,
+            easing: Easing.inOut(Easing.ease),
             useNativeDriver: true,
           }),
         ]),
       ).start()
     } else if (status === 'listening') {
-      // Gentle breathing when listening
       Animated.loop(
         Animated.sequence([
           Animated.timing(pulseAnim, {
@@ -83,7 +112,7 @@ function VoiceOrb({ status }: { status: LiveStatus }) {
             useNativeDriver: true,
           }),
           Animated.timing(pulseAnim, {
-            toValue: 0.98,
+            toValue: 0.96,
             duration: 800,
             easing: Easing.inOut(Easing.ease),
             useNativeDriver: true,
@@ -91,40 +120,92 @@ function VoiceOrb({ status }: { status: LiveStatus }) {
         ]),
       ).start()
       Animated.timing(glowAnim, {
-        toValue: 0.6,
+        toValue: 0.5,
         duration: 400,
         useNativeDriver: true,
       }).start()
+      Animated.timing(breatheAnim, {
+        toValue: 1,
+        duration: 300,
+        useNativeDriver: true,
+      }).start()
     } else if (status === 'thinking') {
-      // Quick subtle pulse when thinking
+      // Rapid shimmer — distinct from speaking/listening
       Animated.loop(
         Animated.sequence([
           Animated.timing(pulseAnim, {
-            toValue: 1.03,
-            duration: 300,
+            toValue: 1.1,
+            duration: 200,
+            easing: Easing.inOut(Easing.ease),
             useNativeDriver: true,
           }),
           Animated.timing(pulseAnim, {
-            toValue: 0.97,
-            duration: 300,
+            toValue: 0.93,
+            duration: 200,
+            easing: Easing.inOut(Easing.ease),
+            useNativeDriver: true,
+          }),
+        ]),
+      ).start()
+      Animated.loop(
+        Animated.sequence([
+          Animated.timing(glowAnim, {
+            toValue: 0.55,
+            duration: 250,
+            easing: Easing.inOut(Easing.ease),
+            useNativeDriver: true,
+          }),
+          Animated.timing(glowAnim, {
+            toValue: 0.2,
+            duration: 250,
+            easing: Easing.inOut(Easing.ease),
+            useNativeDriver: true,
+          }),
+        ]),
+      ).start()
+      Animated.loop(
+        Animated.sequence([
+          Animated.timing(breatheAnim, {
+            toValue: 1.06,
+            duration: 400,
+            easing: Easing.inOut(Easing.ease),
+            useNativeDriver: true,
+          }),
+          Animated.timing(breatheAnim, {
+            toValue: 0.96,
+            duration: 400,
+            easing: Easing.inOut(Easing.ease),
             useNativeDriver: true,
           }),
         ]),
       ).start()
     } else {
-      // Idle / connected - gentle idle state
-      pulseAnim.stopAnimation()
-      glowAnim.stopAnimation()
       Animated.timing(pulseAnim, {
         toValue: 1,
-        duration: 300,
+        duration: 400,
         useNativeDriver: true,
       }).start()
       Animated.timing(glowAnim, {
-        toValue: 0.3,
-        duration: 300,
+        toValue: 0.15,
+        duration: 400,
         useNativeDriver: true,
       }).start()
+      Animated.loop(
+        Animated.sequence([
+          Animated.timing(breatheAnim, {
+            toValue: 1.03,
+            duration: 2000,
+            easing: Easing.inOut(Easing.ease),
+            useNativeDriver: true,
+          }),
+          Animated.timing(breatheAnim, {
+            toValue: 0.98,
+            duration: 2000,
+            easing: Easing.inOut(Easing.ease),
+            useNativeDriver: true,
+          }),
+        ]),
+      ).start()
     }
   }, [status])
 
@@ -132,18 +213,33 @@ function VoiceOrb({ status }: { status: LiveStatus }) {
     inputRange: [0, 1],
     outputRange: ['0deg', '360deg'],
   })
+  const rotation2 = ring2Rotate.interpolate({
+    inputRange: [0, 1],
+    outputRange: ['360deg', '0deg'],
+  })
 
   const orbColor =
     status === 'speaking'
-      ? Colors.accent
+      ? Colors.accent         // warm gold — active voice
       : status === 'listening'
-        ? '#4ECDC4'
+        ? '#4ECDC4'           // teal — receiving input
         : status === 'thinking'
-          ? '#9B59B6'
-          : Colors.accent
+          ? '#E67E22'         // amber — processing
+          : Colors.accent     // gold — idle/connected
 
   return (
     <View style={styles.orbContainer}>
+      {/* Ambient glow */}
+      <Animated.View
+        style={[
+          styles.orbAmbientGlow,
+          {
+            backgroundColor: orbColor,
+            opacity: glowAnim,
+            transform: [{ scale: breatheAnim }],
+          },
+        ]}
+      />
       {/* Outer rotating ring */}
       <Animated.View
         style={[
@@ -155,6 +251,17 @@ function VoiceOrb({ status }: { status: LiveStatus }) {
           },
         ]}
       />
+      {/* Second ring — counter-rotating */}
+      <Animated.View
+        style={[
+          styles.orbRingSecond,
+          {
+            transform: [{ rotate: rotation2 }],
+            borderColor: orbColor,
+            opacity: Animated.multiply(glowAnim, 0.6),
+          },
+        ]}
+      />
       {/* Middle glow ring */}
       <Animated.View
         style={[
@@ -162,7 +269,7 @@ function VoiceOrb({ status }: { status: LiveStatus }) {
           {
             transform: [{ scale: pulseAnim }],
             backgroundColor: orbColor,
-            opacity: glowAnim,
+            opacity: Animated.multiply(glowAnim, 0.8),
           },
         ]}
       />
@@ -173,18 +280,11 @@ function VoiceOrb({ status }: { status: LiveStatus }) {
           {
             transform: [{ scale: pulseAnim }],
             backgroundColor: orbColor,
+            shadowColor: orbColor,
           },
         ]}
       >
-        <Text style={styles.orbEmoji}>
-          {status === 'speaking'
-            ? '\u2728'
-            : status === 'listening'
-              ? '\u{1F442}'
-              : status === 'thinking'
-                ? '\u{1F4AD}'
-                : '\u{1F30D}'}
-        </Text>
+        <View style={styles.orbHighlight} />
       </Animated.View>
     </View>
   )
@@ -203,9 +303,9 @@ function StatusText({ status, stopName }: { status: LiveStatus; stopName: string
   const subtitle = {
     idle: 'Tap below to start your live guide',
     connecting: 'Setting up your personal guide',
-    connected: 'Tap the mic to ask anything',
-    listening: 'Speak naturally, I\'m all ears',
-    speaking: 'Tap mic to interrupt',
+    connected: 'Speak naturally — I\'m listening',
+    listening: 'Speak naturally — I\'m listening',
+    speaking: 'You can interrupt anytime',
     thinking: 'Processing your words...',
   }[status]
 
@@ -276,17 +376,22 @@ export default function GuideScreen() {
     [],
   )
 
+  const [muted, setMuted] = React.useState(false)
+
   const handleMicPress = useCallback(() => {
     if (!connected) {
       connect()
       return
     }
-    if (recording) {
-      stopRecording()
-    } else {
+    // Toggle mute/unmute — mic is always on with LiveKit, this just mutes
+    if (muted) {
       startRecording()
+      setMuted(false)
+    } else {
+      stopRecording()
+      setMuted(true)
     }
-  }, [connected, recording, connect, startRecording, stopRecording])
+  }, [connected, muted, connect, startRecording, stopRecording])
 
   const stopName = currentStop?.name ?? 'this place'
 
@@ -358,7 +463,7 @@ export default function GuideScreen() {
         <TouchableOpacity
           style={[
             styles.micButton,
-            recording && styles.micButtonRecording,
+            muted && styles.micButtonMuted,
             speaking && styles.micButtonSpeaking,
             !connected && !connecting && styles.micButtonConnect,
           ]}
@@ -368,21 +473,17 @@ export default function GuideScreen() {
           <Text style={styles.micIcon}>
             {!connected && !connecting
               ? '\u{1F3A4}'
-              : recording
-                ? '\u23F9'
-                : speaking
-                  ? '\u270B'
-                  : '\u{1F3A4}'}
+              : muted
+                ? '\u{1F507}'
+                : '\u{1F3A4}'}
           </Text>
         </TouchableOpacity>
         <Text style={styles.micHint}>
           {!connected && !connecting
             ? 'Tap to start live guide'
-            : recording
-              ? 'Tap to stop'
-              : speaking
-                ? 'Tap to interrupt'
-                : 'Tap to speak'}
+            : muted
+              ? 'Tap to unmute'
+              : 'Tap to mute'}
         </Text>
       </View>
     </View>
@@ -458,39 +559,57 @@ const styles = StyleSheet.create({
     alignItems: 'center',
   },
   orbContainer: {
-    width: 160,
-    height: 160,
+    width: 180,
+    height: 180,
     justifyContent: 'center',
     alignItems: 'center',
+  },
+  orbAmbientGlow: {
+    position: 'absolute',
+    width: 200,
+    height: 200,
+    borderRadius: 100,
   },
   orbRingOuter: {
     position: 'absolute',
-    width: 160,
-    height: 160,
-    borderRadius: 80,
-    borderWidth: 2,
+    width: 170,
+    height: 170,
+    borderRadius: 85,
+    borderWidth: 1.5,
     borderStyle: 'dashed',
+  },
+  orbRingSecond: {
+    position: 'absolute',
+    width: 150,
+    height: 150,
+    borderRadius: 75,
+    borderWidth: 1,
+    borderStyle: 'dotted',
   },
   orbRingMiddle: {
     position: 'absolute',
-    width: 130,
-    height: 130,
-    borderRadius: 65,
+    width: 120,
+    height: 120,
+    borderRadius: 60,
   },
   orbInner: {
-    width: 100,
-    height: 100,
-    borderRadius: 50,
+    width: 90,
+    height: 90,
+    borderRadius: 45,
     justifyContent: 'center',
     alignItems: 'center',
-    shadowColor: Colors.accent,
     shadowOffset: { width: 0, height: 0 },
-    shadowOpacity: 0.5,
-    shadowRadius: 20,
-    elevation: 10,
+    shadowOpacity: 0.8,
+    shadowRadius: 30,
+    elevation: 15,
   },
-  orbEmoji: {
-    fontSize: 36,
+  orbHighlight: {
+    width: 36,
+    height: 36,
+    borderRadius: 18,
+    backgroundColor: 'rgba(255, 255, 255, 0.25)',
+    marginTop: -12,
+    marginLeft: -8,
   },
 
   // Status
@@ -608,9 +727,9 @@ const styles = StyleSheet.create({
     shadowRadius: 12,
     elevation: 8,
   },
-  micButtonRecording: {
-    backgroundColor: '#4ECDC4',
-    shadowColor: '#4ECDC4',
+  micButtonMuted: {
+    backgroundColor: Colors.gray,
+    shadowColor: Colors.gray,
   },
   micButtonSpeaking: {
     backgroundColor: Colors.surfaceLight,

@@ -1,16 +1,9 @@
 import { useState, useEffect, useRef, useCallback } from 'react'
-import {
-  useAudioRecorder,
-  createAudioPlayer,
-  requestRecordingPermissionsAsync,
-  setAudioModeAsync,
-  IOSOutputFormat,
-  AudioQuality,
-  AudioPlayer,
-} from 'expo-audio'
-import { aiAlpha, LIVE_MODEL, LIVE_CONFIG, getLiveSystemPrompt } from '../services/geminiService'
+import { Room, RoomEvent, RemoteTrack, RemoteTrackPublication, RemoteParticipant } from 'livekit-client'
+import { AudioSession } from '@livekit/react-native'
 import { Stop } from '../types/stop'
-import { writePcmToTempWav } from '../utils/audio'
+import { Config } from '../constants/config'
+import { useUserStore } from '../store/userStore'
 
 interface Transcript {
   role: 'user' | 'assistant'
@@ -25,31 +18,6 @@ interface LiveState {
   error: string | null
 }
 
-const PCM_RECORDING_OPTIONS = {
-  extension: '.wav',
-  sampleRate: 16000,
-  numberOfChannels: 1,
-  bitRate: 256000,
-  android: {
-    outputFormat: 'default' as const,
-    audioEncoder: 'default' as const,
-  },
-  ios: {
-    outputFormat: IOSOutputFormat.LINEARPCM,
-    audioQuality: AudioQuality.HIGH,
-    linearPCMBitDepth: 16,
-    linearPCMIsBigEndian: false,
-    linearPCMIsFloat: false,
-  },
-  web: {
-    mimeType: 'audio/webm' as const,
-    bitsPerSecond: 128000,
-  },
-}
-
-// How often to flush accumulated audio chunks for playback (ms)
-const AUDIO_FLUSH_INTERVAL = 300
-
 export function useGeminiLive(stopContext: Stop | null) {
   const [state, setState] = useState<LiveState>({
     status: 'idle',
@@ -57,15 +25,8 @@ export function useGeminiLive(stopContext: Stop | null) {
     error: null,
   })
 
-  const sessionRef = useRef<any>(null)
-  const audioChunksRef = useRef<string[]>([])
+  const roomRef = useRef<Room | null>(null)
   const isMountedRef = useRef(true)
-  const playerRef = useRef<AudioPlayer | null>(null)
-  const audioQueueRef = useRef<string[]>([]) // queue of WAV file URIs
-  const isPlayingRef = useRef(false)
-  const flushTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null)
-
-  const recorder = useAudioRecorder(PCM_RECORDING_OPTIONS)
 
   useEffect(() => {
     isMountedRef.current = true
@@ -75,223 +36,179 @@ export function useGeminiLive(stopContext: Stop | null) {
     }
   }, [])
 
-  // Play next item in the audio queue
-  async function playNextInQueue() {
-    if (audioQueueRef.current.length === 0) {
-      isPlayingRef.current = false
-      if (isMountedRef.current) {
-        setState((prev) => ({
-          ...prev,
-          status: prev.status === 'speaking' ? 'connected' : prev.status,
-        }))
-      }
-      return
-    }
-
-    isPlayingRef.current = true
-    const fileUri = audioQueueRef.current.shift()!
-
-    try {
-      await setAudioModeAsync({
-        allowsRecording: false,
-        playsInSilentMode: true,
-      })
-
-      // Clean up previous player
-      try { playerRef.current?.pause() } catch {}
-
-      const newPlayer = createAudioPlayer({ uri: fileUri })
-      newPlayer.addListener('playbackStatusUpdate', (status) => {
-        if (status.playing === false && isMountedRef.current) {
-          // Play next chunk when current one finishes
-          playNextInQueue()
-        }
-      })
-      playerRef.current = newPlayer
-      newPlayer.play()
-    } catch (error) {
-      console.error('Audio playback error:', error)
-      // Try next in queue
-      playNextInQueue()
-    }
-  }
-
-  // Flush accumulated audio chunks to a WAV file and queue for playback
-  function flushAudioChunks() {
-    if (audioChunksRef.current.length === 0) return
-
-    const combined = audioChunksRef.current.join('')
-    audioChunksRef.current = []
-
-    try {
-      const fileUri = writePcmToTempWav(combined, 24000)
-      audioQueueRef.current.push(fileUri)
-
-      // Start playback if not already playing
-      if (!isPlayingRef.current) {
-        playNextInQueue()
-      }
-    } catch (error) {
-      console.error('Audio flush error:', error)
-    }
-  }
-
-  // Schedule a flush of audio chunks
-  function scheduleFlush() {
-    if (flushTimerRef.current) return // already scheduled
-    flushTimerRef.current = setTimeout(() => {
-      flushTimerRef.current = null
-      flushAudioChunks()
-    }, AUDIO_FLUSH_INTERVAL)
-  }
-
   const connect = useCallback(async () => {
-    if (!stopContext || sessionRef.current) return
+    if (!stopContext || roomRef.current) return
 
     setState((prev) => ({ ...prev, status: 'connecting', error: null }))
 
     try {
-      const session = await aiAlpha.live.connect({
-        model: LIVE_MODEL,
-        config: {
-          ...LIVE_CONFIG,
-          systemInstruction: {
-            parts: [{ text: getLiveSystemPrompt(stopContext) }],
+      // Configure audio for bidirectional WebRTC (record + playback)
+      await AudioSession.configureAudio({
+        ios: { defaultOutput: 'speaker' },
+      })
+      await AudioSession.setAppleAudioConfiguration({
+        audioCategory: 'playAndRecord',
+        audioCategoryOptions: ['defaultToSpeaker', 'allowBluetooth'],
+        audioMode: 'voiceChat',
+      })
+      await AudioSession.startAudioSession()
+
+      // Get token from server
+      const { name, narrationStyle, language } = useUserStore.getState()
+      const resp = await fetch(`${Config.SERVER_URL}/token`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          userId: name || 'explorer',
+          stopContext: {
+            name: stopContext.name,
+            description: stopContext.description,
           },
-        },
-        callbacks: {
-          onopen: () => {
-            if (!isMountedRef.current) return
+          userPrefs: { name, narrationStyle, language },
+        }),
+      })
+
+      if (!resp.ok) {
+        throw new Error(`Server returned ${resp.status}`)
+      }
+
+      const { token, wsUrl } = await resp.json()
+
+      // Create and configure LiveKit room with proper options
+      const room = new Room({
+        adaptiveStream: true,
+        dynacast: false,
+        disconnectOnPageLeave: false,
+      })
+
+      // Handle data messages from agent (transcripts, status)
+      room.on(RoomEvent.DataReceived, (data: Uint8Array) => {
+        if (!isMountedRef.current) return
+        try {
+          const msg = JSON.parse(new TextDecoder().decode(data))
+
+          if (msg.type === 'status') {
+            setState((prev) => ({ ...prev, status: msg.value as LiveStatus }))
+          }
+
+          if (msg.type === 'inputTranscription') {
+            setState((prev) => {
+              const transcripts = [...prev.transcripts]
+              const last = transcripts[transcripts.length - 1]
+              if (last?.role === 'user') {
+                transcripts[transcripts.length - 1] = {
+                  ...last,
+                  content: last.content + msg.text,
+                }
+              } else {
+                transcripts.push({ role: 'user', content: msg.text })
+              }
+              return { ...prev, transcripts }
+            })
+          }
+
+          if (msg.type === 'outputTranscription') {
+            setState((prev) => {
+              const transcripts = [...prev.transcripts]
+              const last = transcripts[transcripts.length - 1]
+              if (last?.role === 'assistant') {
+                transcripts[transcripts.length - 1] = {
+                  ...last,
+                  content: last.content + msg.text,
+                }
+              } else {
+                transcripts.push({ role: 'assistant', content: msg.text })
+              }
+              return { ...prev, transcripts }
+            })
+          }
+
+          if (msg.type === 'turnComplete') {
             setState((prev) => ({
               ...prev,
               status: 'connected',
             }))
-          },
-          onmessage: (message: any) => {
-            if (!isMountedRef.current) return
+          }
 
-            const content = message.serverContent
-            if (!content) return
-
-            // Collect audio chunks and schedule flush for streaming playback
-            if (content.modelTurn?.parts) {
-              for (const part of content.modelTurn.parts) {
-                if (part.inlineData?.data) {
-                  audioChunksRef.current.push(part.inlineData.data)
-                  setState((prev) => ({ ...prev, status: 'speaking' }))
-                  scheduleFlush()
-                }
-              }
-            }
-
-            // Handle transcriptions
-            if (content.inputTranscription?.text) {
-              const text = content.inputTranscription.text
-              setState((prev) => {
-                const transcripts = [...prev.transcripts]
-                const last = transcripts[transcripts.length - 1]
-                if (last?.role === 'user') {
-                  transcripts[transcripts.length - 1] = {
-                    ...last,
-                    content: last.content + text,
-                  }
-                } else {
-                  transcripts.push({ role: 'user', content: text })
-                }
-                return { ...prev, transcripts }
-              })
-            }
-
-            if (content.outputTranscription?.text) {
-              const text = content.outputTranscription.text
-              setState((prev) => {
-                const transcripts = [...prev.transcripts]
-                const last = transcripts[transcripts.length - 1]
-                if (last?.role === 'assistant') {
-                  transcripts[transcripts.length - 1] = {
-                    ...last,
-                    content: last.content + text,
-                  }
-                } else {
-                  transcripts.push({ role: 'assistant', content: text })
-                }
-                return { ...prev, transcripts }
-              })
-            }
-
-            // Turn complete — flush any remaining audio
-            if (content.turnComplete) {
-              if (flushTimerRef.current) {
-                clearTimeout(flushTimerRef.current)
-                flushTimerRef.current = null
-              }
-              flushAudioChunks()
-            }
-          },
-          onerror: (e: any) => {
-            if (!isMountedRef.current) return
-            console.error('Live session error:', e)
+          if (msg.type === 'error') {
             setState((prev) => ({
               ...prev,
-              error: e.message || 'Connection error',
-              status: 'idle',
+              error: msg.message || 'Agent error',
             }))
-          },
-          onclose: () => {
-            if (!isMountedRef.current) return
-            sessionRef.current = null
-            setState((prev) => ({
-              ...prev,
-              status: 'idle',
-            }))
-          },
-        },
+          }
+        } catch {}
       })
 
-      sessionRef.current = session
+      room.on(RoomEvent.Disconnected, () => {
+        console.log('[LiveKit] Disconnected from room')
+        if (!isMountedRef.current) return
+        roomRef.current = null
+        setState((prev) => ({ ...prev, status: 'idle' }))
+      })
+
+      room.on(RoomEvent.Reconnecting, () => {
+        console.log('[LiveKit] Reconnecting...')
+      })
+
+      room.on(RoomEvent.Reconnected, () => {
+        console.log('[LiveKit] Reconnected')
+        if (isMountedRef.current) {
+          setState((prev) => ({ ...prev, status: 'connected' }))
+        }
+      })
+
+      // Log when agent audio track is subscribed (confirms audio path works)
+      room.on(
+        RoomEvent.TrackSubscribed,
+        (track: RemoteTrack, pub: RemoteTrackPublication, participant: RemoteParticipant) => {
+          console.log(`[LiveKit] Track subscribed: ${participant.identity} kind=${track.kind} source=${pub.source}`)
+        },
+      )
+
+      // Connect to LiveKit room
+      await room.connect(wsUrl, token)
+      roomRef.current = room
+      console.log('[LiveKit] Connected to room:', room.name)
+
+      // Enable microphone — audio streams continuously to agent via WebRTC
+      // Gemini's native VAD handles turn detection automatically
+      await room.localParticipant.setMicrophoneEnabled(true)
+      console.log('[LiveKit] Microphone enabled')
+
+      if (isMountedRef.current) {
+        setState((prev) => ({ ...prev, status: 'connected' }))
+      }
     } catch (error: any) {
-      if (!isMountedRef.current) return
-      console.error('Failed to connect:', error)
-      setState((prev) => ({
-        ...prev,
-        status: 'idle',
-        error: error.message || 'Failed to connect',
-      }))
+      console.error('LiveKit connect error:', error)
+      if (isMountedRef.current) {
+        setState((prev) => ({
+          ...prev,
+          status: 'idle',
+          error: error.message || 'Failed to connect',
+        }))
+      }
     }
   }, [stopContext])
 
   const disconnect = useCallback(() => {
-    if (flushTimerRef.current) {
-      clearTimeout(flushTimerRef.current)
-      flushTimerRef.current = null
+    if (roomRef.current) {
+      roomRef.current.disconnect()
+      roomRef.current = null
     }
-    if (recorder.isRecording) {
-      recorder.stop().catch(() => {})
-    }
-    try { playerRef.current?.pause() } catch {}
-    audioQueueRef.current = []
-    isPlayingRef.current = false
-    if (sessionRef.current) {
-      try {
-        sessionRef.current.close()
-      } catch {}
-      sessionRef.current = null
-    }
-    audioChunksRef.current = []
+    AudioSession.stopAudioSession()
     if (isMountedRef.current) {
-      setState((prev) => ({
-        ...prev,
-        status: 'idle',
-      }))
+      setState((prev) => ({ ...prev, status: 'idle' }))
     }
-  }, [recorder])
+  }, [])
 
   const sendText = useCallback((text: string) => {
-    if (!sessionRef.current || !text.trim()) return
+    if (!roomRef.current || !text.trim()) return
 
-    sessionRef.current.sendClientContent({
-      turns: [{ role: 'user', parts: [{ text: text.trim() }] }],
-    })
+    const data = new TextEncoder().encode(
+      JSON.stringify({ type: 'text', text: text.trim() }),
+    )
+    roomRef.current.localParticipant.publishData(data, { reliable: true })
+
     setState((prev) => ({
       ...prev,
       transcripts: [
@@ -301,81 +218,23 @@ export function useGeminiLive(stopContext: Stop | null) {
     }))
   }, [])
 
+  // startRecording = unmute mic (for UI compatibility)
   const startRecording = useCallback(async () => {
-    if (!sessionRef.current) return
-
-    try {
-      const permission = await requestRecordingPermissionsAsync()
-      if (!permission.granted) {
-        setState((prev) => ({
-          ...prev,
-          error: 'Microphone permission denied',
-        }))
-        return
-      }
-
-      await setAudioModeAsync({
-        allowsRecording: true,
-        playsInSilentMode: true,
-      })
-
-      await recorder.prepareToRecordAsync()
-      recorder.record()
-
-      if (isMountedRef.current) {
-        setState((prev) => ({ ...prev, status: 'listening' }))
-      }
-    } catch (error: any) {
-      console.error('Failed to start recording:', error)
-      if (isMountedRef.current) {
-        setState((prev) => ({
-          ...prev,
-          error: 'Failed to start recording',
-        }))
-      }
+    if (!roomRef.current) return
+    await roomRef.current.localParticipant.setMicrophoneEnabled(true)
+    if (isMountedRef.current) {
+      setState((prev) => ({ ...prev, status: 'listening' }))
     }
-  }, [recorder])
+  }, [])
 
+  // stopRecording = mute mic (for UI compatibility)
   const stopRecording = useCallback(async () => {
-    if (!recorder.isRecording || !sessionRef.current) return
-
-    try {
-      await recorder.stop()
-      const uri = recorder.uri
-
-      if (isMountedRef.current) {
-        setState((prev) => ({ ...prev, status: 'thinking' }))
-      }
-
-      if (uri) {
-        const response = await fetch(uri)
-        const blob = await response.blob()
-        const reader = new FileReader()
-        reader.onload = () => {
-          const base64 = (reader.result as string).split(',')[1]
-          if (base64 && sessionRef.current) {
-            sessionRef.current.sendRealtimeInput({
-              audio: {
-                data: base64,
-                mimeType: 'audio/pcm;rate=16000',
-              },
-            })
-          }
-        }
-        reader.readAsDataURL(blob)
-      }
-
-      await setAudioModeAsync({
-        allowsRecording: false,
-        playsInSilentMode: true,
-      })
-    } catch (error: any) {
-      console.error('Failed to stop recording:', error)
-      if (isMountedRef.current) {
-        setState((prev) => ({ ...prev, status: 'connected' }))
-      }
+    if (!roomRef.current) return
+    await roomRef.current.localParticipant.setMicrophoneEnabled(false)
+    if (isMountedRef.current) {
+      setState((prev) => ({ ...prev, status: 'connected' }))
     }
-  }, [recorder])
+  }, [])
 
   return {
     ...state,
