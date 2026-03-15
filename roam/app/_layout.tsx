@@ -10,14 +10,11 @@ import {
 } from '@expo-google-fonts/poppins'
 import { Colors, Fonts } from '../constants/colors'
 import { useUserStore } from '../store/userStore'
+import { ConnectionProvider } from '../hooks/useConnection'
 
 // Register WebRTC globals for LiveKit — must be called once before any Room usage
-try {
-  const { registerGlobals } = require('@livekit/react-native')
-  registerGlobals()
-} catch {
-  console.warn('LiveKit native module not linked — run `npx expo run:ios` to rebuild')
-}
+import { registerGlobals } from '@livekit/react-native'
+registerGlobals()
 
 export default function RootLayout() {
   const onboarded = useUserStore((s) => s.onboarded)
@@ -46,7 +43,7 @@ export default function RootLayout() {
   }
 
   return (
-    <>
+    <ConnectionProvider>
       {!onboarded && <Redirect href="/onboarding" />}
       <Stack
         screenOptions={{
@@ -67,13 +64,13 @@ export default function RootLayout() {
         <Stack.Screen name="tour/map" options={{ title: 'Tour Map' }} />
         <Stack.Screen name="tour/camera" options={{ title: 'Verify Landmark' }} />
         <Stack.Screen name="tour/story" options={{ title: 'Story' }} />
-        <Stack.Screen name="tour/guide" options={{ title: 'Live Guide', headerShown: false }} />
+        <Stack.Screen name="tour/assistant" options={{ title: 'Live Assistant', headerShown: false }} />
         <Stack.Screen name="tour/history" options={{ title: 'See the Past' }} />
         <Stack.Screen
           name="tour/completion"
           options={{ title: 'Tour Complete', headerShown: false }}
         />
       </Stack>
-    </>
+    </ConnectionProvider>
   )
 }

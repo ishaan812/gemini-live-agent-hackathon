@@ -1,4 +1,4 @@
-import React, { useCallback, useEffect, useRef, useState } from 'react'
+import React, { useCallback, useEffect, useState } from 'react'
 import {
   StyleSheet,
   Text,
@@ -10,43 +10,28 @@ import { useRouter } from 'expo-router'
 import { useTour } from '../../hooks/useTour'
 import { generateNarration } from '../../services/geminiService'
 import { useNarrationPlayback } from '../../hooks/useNarrationPlayback'
-import { useGeminiLive } from '../../hooks/useGeminiLive'
 import { HighlightedNarration } from '../../components/HighlightedNarration'
-import { FloatingOrb, OrbMode } from '../../components/FloatingOrb'
 import { Colors, Fonts } from '../../constants/colors'
+import { useConnection } from '../../hooks/useConnection'
 
-type ScreenMode = 'loading' | 'narrating' | 'paused' | 'conversing'
+type ScreenMode = 'loading' | 'narrating'
 
 export default function StoryScreen() {
   const router = useRouter()
   const { stops, currentStop, currentStopIndex, nextStop, isComplete } = useTour()
   const [narration, setNarration] = useState<string>('')
   const [mode, setMode] = useState<ScreenMode>('loading')
-
-  const resumeTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null)
+  const connection = useConnection()
 
   const nextStopData = currentStopIndex < stops.length - 1 ? stops[currentStopIndex + 1] : null
 
   const {
-    status: narrationStatus,
     currentWordIndex,
     words,
     start: startNarration,
     pause: pauseNarration,
-    resume: resumeNarration,
     stop: stopNarration,
   } = useNarrationPlayback()
-
-  const {
-    status: liveStatus,
-    connected: qaConnected,
-    speaking: qaSpeaking,
-    recording: qaRecording,
-    connect: qaConnect,
-    disconnect: qaDisconnect,
-    startRecording: qaStartRecording,
-    stopRecording: qaStopRecording,
-  } = useGeminiLive(currentStop)
 
   // Generate narration text on mount
   useEffect(() => {
@@ -65,75 +50,24 @@ export default function StoryScreen() {
     return () => {
       cancelled = true
       stopNarration()
-      qaDisconnect()
-      if (resumeTimerRef.current) clearTimeout(resumeTimerRef.current)
     }
   }, [currentStop?.id])
 
-  // Watch for Q&A answer to finish → auto-resume narration
-  useEffect(() => {
-    if (mode === 'conversing' && !qaSpeaking && !qaRecording && liveStatus === 'connected') {
-      resumeTimerRef.current = setTimeout(() => {
-        qaDisconnect()
-        resumeNarration()
-        setMode('narrating')
-      }, 1500)
-    }
-
-    return () => {
-      if (resumeTimerRef.current) {
-        clearTimeout(resumeTimerRef.current)
-        resumeTimerRef.current = null
-      }
-    }
-  }, [mode, qaSpeaking, qaRecording, liveStatus])
-
-  const handleOrbPress = useCallback(() => {
-    if (resumeTimerRef.current) {
-      clearTimeout(resumeTimerRef.current)
-      resumeTimerRef.current = null
-    }
-
-    if (mode === 'narrating') {
-      pauseNarration()
-      setMode('paused')
-      qaConnect()
-    } else if (mode === 'paused') {
-      if (qaConnected) {
-        qaStartRecording()
-        setMode('conversing')
-      }
-    } else if (mode === 'conversing') {
-      if (qaRecording) {
-        qaStopRecording()
-      } else if (qaSpeaking) {
-        qaDisconnect()
-        resumeNarration()
-        setMode('narrating')
-      }
-    }
-  }, [
-    mode, qaConnected, qaRecording, qaSpeaking,
-    pauseNarration, resumeNarration,
-    qaConnect, qaDisconnect, qaStartRecording, qaStopRecording,
-  ])
+  const handleLiveGuide = useCallback(() => {
+    pauseNarration()
+    connection.connect()
+    router.push('/tour/assistant')
+  }, [pauseNarration, connection, router])
 
   const handleNextStop = useCallback(() => {
     stopNarration()
-    qaDisconnect()
     if (isComplete) {
       router.push('/tour/completion')
     } else {
       nextStop()
       router.push('/tour/map')
     }
-  }, [isComplete, nextStop, router, stopNarration, qaDisconnect])
-
-  const orbMode: OrbMode =
-    mode === 'narrating' ? 'narrating'
-      : mode === 'paused' ? 'paused'
-        : mode === 'conversing' ? 'conversing'
-          : 'idle'
+  }, [isComplete, nextStop, router, stopNarration])
 
   if (mode === 'loading' && !narration) {
     return (
@@ -146,13 +80,12 @@ export default function StoryScreen() {
 
   return (
     <View style={styles.container}>
-      {/* TOP: Orb section */}
-      <View style={styles.orbSection}>
+      {/* TOP: Stop name */}
+      <View style={styles.headerSection}>
         <Text style={styles.stopName}>{currentStop?.name}</Text>
-        <FloatingOrb mode={orbMode} onPress={handleOrbPress} />
       </View>
 
-      {/* BOTTOM: Text card */}
+      {/* MIDDLE: Text card */}
       <View style={styles.textCard}>
         {words.length > 0 ? (
           <HighlightedNarration
@@ -166,6 +99,12 @@ export default function StoryScreen() {
 
       {/* BUTTONS */}
       <View style={styles.buttonContainer}>
+        <TouchableOpacity
+          style={styles.guideButton}
+          onPress={handleLiveGuide}
+        >
+          <Text style={styles.guideButtonText}>Live Guide</Text>
+        </TouchableOpacity>
         <TouchableOpacity
           style={styles.secondaryButton}
           onPress={() => router.push('/tour/history')}
@@ -200,24 +139,22 @@ const styles = StyleSheet.create({
     marginTop: 16,
   },
 
-  // Top section — orb
-  orbSection: {
-    flex: 0.38,
+  // Top section — header
+  headerSection: {
+    paddingTop: 16,
+    paddingBottom: 12,
     alignItems: 'center',
-    justifyContent: 'center',
-    paddingTop: 8,
   },
   stopName: {
     fontSize: 22,
     fontFamily: Fonts.bold,
     color: Colors.text,
-    marginBottom: 12,
     textAlign: 'center',
   },
 
-  // Bottom section — text card
+  // Middle section — text card
   textCard: {
-    flex: 0.52,
+    flex: 1,
     marginHorizontal: 16,
     backgroundColor: Colors.surface,
     borderRadius: 20,
@@ -235,12 +172,21 @@ const styles = StyleSheet.create({
 
   // Buttons
   buttonContainer: {
-    flex: 0.1,
     paddingHorizontal: 16,
     paddingVertical: 8,
     gap: 8,
-    justifyContent: 'flex-end',
     paddingBottom: 16,
+  },
+  guideButton: {
+    backgroundColor: Colors.accent,
+    paddingVertical: 14,
+    borderRadius: 14,
+    alignItems: 'center',
+  },
+  guideButtonText: {
+    color: '#000',
+    fontSize: 16,
+    fontFamily: Fonts.bold,
   },
   secondaryButton: {
     backgroundColor: Colors.surfaceLight,
@@ -254,13 +200,13 @@ const styles = StyleSheet.create({
     fontFamily: Fonts.semiBold,
   },
   nextButton: {
-    backgroundColor: Colors.accent,
+    backgroundColor: Colors.surfaceLight,
     paddingVertical: 14,
     borderRadius: 14,
     alignItems: 'center',
   },
   nextButtonText: {
-    color: '#000',
+    color: Colors.text,
     fontSize: 16,
     fontFamily: Fonts.bold,
   },
