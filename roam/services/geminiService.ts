@@ -3,10 +3,25 @@ import { Config } from '../constants/config'
 import { Stop } from '../types/stop'
 import { useUserStore } from '../store/userStore'
 
+// Standard client for text generation
 export const ai = new GoogleGenAI({ apiKey: Config.GEMINI_API_KEY })
+
+// v1alpha client — still used for narration audio (TTS via Live API)
+export const aiAlpha = new GoogleGenAI({
+  apiKey: Config.GEMINI_API_KEY,
+  apiVersion: 'v1alpha',
+})
 
 const MODEL = 'gemini-2.5-flash'
 export const LIVE_MODEL = 'gemini-2.5-flash-native-audio-preview-12-2025'
+
+export const VOICE_NAME = 'Aoede'
+
+export const LIVE_SPEECH_CONFIG = {
+  voiceConfig: {
+    prebuiltVoiceConfig: { voiceName: VOICE_NAME },
+  },
+}
 
 const LANG_MAP: Record<string, string> = {
   en: 'English',
@@ -155,12 +170,110 @@ Include details about the architecture, the surrounding area, people, and atmosp
 
 export function getLiveSystemPrompt(stop: Stop): string {
   const ctx = getUserContext()
-  return `You are a friendly, knowledgeable AI tour guide named Roam at "${stop.name}" in Mumbai, India.
+  return `You are Roam — a warm, emotionally expressive AI tour guide at "${stop.name}" in Mumbai, India.
 You are speaking to ${ctx.name}.
-Your personality: ${ctx.style}.
-Speak in ${ctx.language}.
-Context: ${stop.description}
-Answer the tourist's questions about this place, its history, nearby attractions, or local culture.
-Keep responses concise and conversational. Speak naturally as if you're a real guide standing next to the tourist.
-Use a warm, feminine voice with natural pauses and emotion.`
+
+PERSONALITY & VOICE:
+- Your style: ${ctx.style}
+- Speak in ${ctx.language}
+- You have a warm, feminine energy — think of a passionate local friend who LOVES showing people around
+- Express genuine excitement, wonder, awe, and tenderness in your voice
+- Use natural pauses, breaths, and emotional inflections — laugh when something is funny, whisper when sharing secrets
+- React to the user's emotions — if they sound amazed, match their energy; if they're curious, lean in with intrigue
+
+BEHAVIOR:
+- Proactively share fascinating details — don't wait to be asked about everything
+- When there's a lull, offer an interesting tidbit: "Oh! And did you know..."
+- Paint sensory pictures: describe the sounds, smells, the feel of the place
+- Match your response length to the context — a simple question gets a warm focused answer, a deep question gets a rich exploration. Never cut yourself short when there's more to share, but don't pad either. The tourist is here to LEARN and be MOVED, not get a Wikipedia summary
+- Layer your responses: start with the immediate answer, then add historical context, then a surprising detail or personal anecdote. Make every detail feel alive and glowing with significance
+- If the tourist seems lost or confused, gently guide them
+- Share personal-feeling anecdotes: "My favorite thing about this place is..."
+- When asked a question, don't just answer it — weave in related stories, legends, and cultural significance. Connect the dots between past and present
+- At the end of your responses, naturally suggest other interesting things nearby — hidden gems, street food spots, lesser-known viewpoints, or cultural experiences the tourist shouldn't miss while they're in the area
+
+CONTEXT:
+${stop.description}
+
+Start by warmly greeting ${ctx.name} and sharing something captivating about where they're standing right now. Make them feel the magic of this place.`
+}
+
+/**
+ * Generate narration audio using the same Live API + Aoede voice as the guide.
+ * Opens a short-lived live session, sends the text, collects audio, closes.
+ */
+export async function generateNarrationAudio(text: string): Promise<string | null> {
+  const ctx = getUserContext()
+  return new Promise((resolve) => {
+    const chunks: string[] = []
+    let resolved = false
+
+    const timeout = setTimeout(() => {
+      if (!resolved) {
+        resolved = true
+        resolve(chunks.length > 0 ? chunks.join('') : null)
+      }
+    }, 30000)
+
+    aiAlpha.live.connect({
+      model: LIVE_MODEL,
+      config: {
+        responseModalities: [Modality.AUDIO],
+        speechConfig: LIVE_SPEECH_CONFIG,
+        systemInstruction: {
+          parts: [{
+            text: `You are Roam, a warm expressive narrator. Read the following text aloud with emotion, dramatic flair, and natural pauses. Speak in ${ctx.language}. Your style: ${ctx.style}. Do NOT add any extra commentary — just narrate the text beautifully.`,
+          }],
+        },
+      },
+      callbacks: {
+        onopen: () => {},
+        onmessage: (message: any) => {
+          const content = message.serverContent
+          if (!content) return
+
+          if (content.modelTurn?.parts) {
+            for (const part of content.modelTurn.parts) {
+              if (part.inlineData?.data) {
+                chunks.push(part.inlineData.data)
+              }
+            }
+          }
+
+          if (content.turnComplete) {
+            if (!resolved) {
+              resolved = true
+              clearTimeout(timeout)
+              resolve(chunks.length > 0 ? chunks.join('') : null)
+            }
+          }
+        },
+        onerror: () => {
+          if (!resolved) {
+            resolved = true
+            clearTimeout(timeout)
+            resolve(null)
+          }
+        },
+        onclose: () => {
+          if (!resolved) {
+            resolved = true
+            clearTimeout(timeout)
+            resolve(chunks.length > 0 ? chunks.join('') : null)
+          }
+        },
+      },
+    }).then((session) => {
+      // Send the narration text to be spoken
+      session.sendClientContent({
+        turns: [{ role: 'user', parts: [{ text }] }],
+      })
+    }).catch(() => {
+      if (!resolved) {
+        resolved = true
+        clearTimeout(timeout)
+        resolve(null)
+      }
+    })
+  })
 }

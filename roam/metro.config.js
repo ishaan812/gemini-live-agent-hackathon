@@ -6,4 +6,7 @@ const config = getDefaultConfig(__dirname)
 config.resolver.unstable_enablePackageExports = true
 config.resolver.unstable_conditionNames = ['browser', 'import', 'default']
 
+// Add .mjs to source extensions for livekit-client
+config.resolver.sourceExts = [...(config.resolver.sourceExts || []), 'mjs']
+
 module.exports = config
