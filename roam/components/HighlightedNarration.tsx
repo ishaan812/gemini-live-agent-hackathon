@@ -70,13 +70,13 @@ const styles = StyleSheet.create({
     lineHeight: 32,
   },
   pastWord: {
-    color: Colors.text,
+    color: 'rgba(255,255,255,0.85)',
   },
   currentWord: {
-    color: Colors.accent,
+    color: '#FFFFFF',
     fontFamily: Fonts.bold,
   },
   futureWord: {
-    color: Colors.gray,
+    color: 'rgba(255,255,255,0.35)',
   },
 })

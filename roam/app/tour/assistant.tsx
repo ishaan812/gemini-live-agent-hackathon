@@ -22,7 +22,7 @@ import ControlBar from '../../components/assistant/ControlBar';
 import ChatBar from '../../components/assistant/ChatBar';
 import ChatLog from '../../components/assistant/ChatLog';
 import AgentVisualization from '../../components/assistant/AgentVisualization';
-import { Track } from 'livekit-client';
+import { LocalVideoTrack, Track } from 'livekit-client';
 import {
   TrackReference,
   useSessionMessages,
@@ -99,6 +99,17 @@ const RoomView = () => {
       ? localScreenShareTrack[0]
       : null;
 
+  // Camera facing mode
+  const [facingMode, setFacingMode] = useState<'user' | 'environment'>('environment');
+  const onFlipCamera = useCallback(async () => {
+    const newMode = facingMode === 'user' ? 'environment' : 'user';
+    const videoTrack = localParticipant.getTrackPublication(Track.Source.Camera)?.track;
+    if (videoTrack && videoTrack instanceof LocalVideoTrack) {
+      await videoTrack.restartTrack({ facingMode: newMode });
+    }
+    setFacingMode(newMode);
+  }, [facingMode, localParticipant]);
+
   // Messages
   const { messages, send } = useSessionMessages();
   const [isChatEnabled, setChatEnabled] = useState(false);
@@ -152,7 +163,7 @@ const RoomView = () => {
         },
       ]}
     >
-      <VideoTrack trackRef={localVideoTrack} style={styles.video} />
+      <VideoTrack trackRef={localVideoTrack} mirror={facingMode === 'user'} style={styles.video} />
     </Animated.View>
   ) : null;
 
@@ -200,6 +211,7 @@ const RoomView = () => {
           isChatEnabled,
           onMicClick: micToggle.toggle,
           onCameraClick: cameraToggle.toggle,
+          onFlipCameraClick: onFlipCamera,
           onChatClick,
           onScreenShareClick: screenShareToggle.toggle,
           onExitClick,

@@ -47,29 +47,20 @@ export default function RootLayout() {
       {!onboarded && <Redirect href="/onboarding" />}
       <Stack
         screenOptions={{
-          headerStyle: { backgroundColor: Colors.primaryLight },
-          headerTintColor: Colors.white,
-          headerTitleStyle: { fontFamily: Fonts.semiBold },
+          headerShown: false,
           contentStyle: { backgroundColor: Colors.background },
-          headerBackTitle: 'Back',
         }}
       >
-        <Stack.Screen name="index" options={{ title: 'Roam', headerShown: false }} />
-        <Stack.Screen
-          name="onboarding"
-          options={{ headerShown: false, gestureEnabled: false }}
-        />
-        <Stack.Screen name="profile" options={{ title: 'Profile' }} />
-        <Stack.Screen name="tour/overview" options={{ title: 'Tour Stops' }} />
-        <Stack.Screen name="tour/map" options={{ title: 'Tour Map' }} />
-        <Stack.Screen name="tour/camera" options={{ title: 'Verify Landmark' }} />
-        <Stack.Screen name="tour/story" options={{ title: 'Story' }} />
-        <Stack.Screen name="tour/assistant" options={{ title: 'Live Assistant', headerShown: false }} />
-        <Stack.Screen name="tour/history" options={{ title: 'See the Past' }} />
-        <Stack.Screen
-          name="tour/completion"
-          options={{ title: 'Tour Complete', headerShown: false }}
-        />
+        <Stack.Screen name="index" />
+        <Stack.Screen name="onboarding" options={{ gestureEnabled: false }} />
+        <Stack.Screen name="profile" />
+        <Stack.Screen name="tour/overview" />
+        <Stack.Screen name="tour/map" />
+        <Stack.Screen name="tour/camera" />
+        <Stack.Screen name="tour/story" />
+        <Stack.Screen name="tour/assistant" />
+        <Stack.Screen name="tour/history" />
+        <Stack.Screen name="tour/completion" />
       </Stack>
     </ConnectionProvider>
   )

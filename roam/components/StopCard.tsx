@@ -42,16 +42,16 @@ export function StopCard({ stop, isActive, isCompleted, distance }: Props) {
 
 const styles = StyleSheet.create({
   card: {
-    backgroundColor: Colors.card,
-    borderRadius: 12,
+    backgroundColor: 'rgba(255,255,255,0.08)',
+    borderRadius: 20,
     padding: 16,
     marginVertical: 6,
     marginHorizontal: 16,
     borderWidth: 1,
-    borderColor: Colors.border,
+    borderColor: 'rgba(255,255,255,0.15)',
   },
   activeCard: {
-    borderLeftWidth: 4,
+    borderLeftWidth: 3,
     borderLeftColor: Colors.accent,
   },
   completedCard: {
@@ -66,7 +66,7 @@ const styles = StyleSheet.create({
     width: 10,
     height: 10,
     borderRadius: 5,
-    backgroundColor: Colors.gray,
+    backgroundColor: 'rgba(255,255,255,0.3)',
     marginRight: 10,
   },
   activeIndicator: {

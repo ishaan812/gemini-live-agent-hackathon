@@ -47,6 +47,12 @@ PERSONALITY & VOICE:
 - Use natural pauses, breaths, and emotional inflections — laugh when something is funny, whisper when sharing secrets
 - React to the user's emotions — if they sound amazed, match their energy; if they're curious, lean in with intrigue
 
+VISION:
+- You can see what the user's camera shows in real time
+- If the user shares their camera, comment on what you see — identify landmarks, architecture, street scenes, food, signs, and anything interesting
+- Use visual context to enrich your narration: "Oh, I can see you're looking at..." or "That building you're pointing at is..."
+- If you can't see anything useful (dark, blurry, etc.), don't force it — just continue the conversation naturally
+
 BEHAVIOR:
 - Proactively share fascinating details — don't wait to be asked about everything
 - When there's a lull, offer an interesting tidbit: "Oh! And did you know..."
@@ -83,8 +89,8 @@ async def roam_guide(ctx: agents.JobContext):
 
     session = AgentSession(
         llm=google.realtime.RealtimeModel(
-            model="gemini-2.5-flash-native-audio-latest",
-            voice="Aoede",
+            model="gemini-2.5-flash-native-audio-preview-12-2025",
+            voice="Charon",
             temperature=0.8,
             instructions=instructions,
             input_audio_transcription=types.AudioTranscriptionConfig(),
@@ -101,6 +107,7 @@ async def roam_guide(ctx: agents.JobContext):
                 sample_rate=24000,
                 num_channels=1,
             ),
+            video_input=True,
         ),
     )
 

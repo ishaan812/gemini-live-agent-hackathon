@@ -69,12 +69,11 @@ const UserTranscriptionText = (props: { text: string }) => {
 
 const AgentTranscriptionText = (props: { text: string }) => {
   let { text } = props;
-  const colorScheme = useColorScheme();
-  const themeTextStyle =
-    colorScheme === 'light' ? styles.lightThemeText : styles.darkThemeText;
   return (
     text && (
-      <Text style={[styles.agentTranscription, themeTextStyle]}>{text}</Text>
+      <Text style={[styles.agentTranscription, styles.agentThemeText]}>
+        {text}
+      </Text>
     )
   );
 };
@@ -104,6 +103,9 @@ const styles = StyleSheet.create({
     fontSize: 17,
     textAlign: 'left',
     margin: 16,
+  },
+  agentThemeText: {
+    color: '#FFFFFF',
   },
   lightThemeText: {
     color: '#000000',

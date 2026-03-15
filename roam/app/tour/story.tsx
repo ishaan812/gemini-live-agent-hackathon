@@ -6,6 +6,8 @@ import {
   View,
   ActivityIndicator,
 } from 'react-native'
+import { SafeAreaView } from 'react-native-safe-area-context'
+import { LinearGradient } from 'expo-linear-gradient'
 import { useRouter } from 'expo-router'
 import { useTour } from '../../hooks/useTour'
 import { generateNarration } from '../../services/geminiService'
@@ -54,10 +56,10 @@ export default function StoryScreen() {
   }, [currentStop?.id])
 
   const handleLiveGuide = useCallback(() => {
-    pauseNarration()
+    stopNarration()
     connection.connect()
     router.push('/tour/assistant')
-  }, [pauseNarration, connection, router])
+  }, [stopNarration, connection, router])
 
   const handleNextStop = useCallback(() => {
     stopNarration()
@@ -71,66 +73,119 @@ export default function StoryScreen() {
 
   if (mode === 'loading' && !narration) {
     return (
-      <View style={styles.loadingContainer}>
-        <ActivityIndicator size="large" color={Colors.accent} />
-        <Text style={styles.loadingText}>Preparing your story...</Text>
-      </View>
+      <LinearGradient
+        colors={[Colors.gradientStart, Colors.gradientMid, Colors.gradientEnd]}
+        style={styles.loadingContainer}
+      >
+        <View style={styles.loadingCard}>
+          <ActivityIndicator size="large" color={Colors.accent} />
+          <Text style={styles.loadingText}>Preparing your story...</Text>
+        </View>
+      </LinearGradient>
     )
   }
 
   return (
-    <View style={styles.container}>
-      {/* TOP: Stop name */}
-      <View style={styles.headerSection}>
-        <Text style={styles.stopName}>{currentStop?.name}</Text>
-      </View>
+    <LinearGradient
+      colors={[Colors.gradientStart, Colors.gradientMid, Colors.gradientEnd]}
+      style={styles.container}
+    >
+      <SafeAreaView style={styles.safeArea}>
+        {/* Header */}
+        <View style={styles.headerSection}>
+          <TouchableOpacity
+            style={styles.backButton}
+            onPress={() => router.back()}
+          >
+            <Text style={styles.backButtonText}>‹ Back</Text>
+          </TouchableOpacity>
+          <View style={styles.headerCenter}>
+            <Text style={styles.headerLabel}>Roam AI</Text>
+            <Text style={styles.headerSub}>
+              {currentStop?.name}
+            </Text>
+          </View>
+          <View style={{ width: 80 }} />
+        </View>
 
-      {/* MIDDLE: Text card */}
-      <View style={styles.textCard}>
-        {words.length > 0 ? (
-          <HighlightedNarration
-            words={words}
-            currentWordIndex={currentWordIndex}
-          />
-        ) : (
-          <Text style={styles.fallbackText}>{narration}</Text>
-        )}
-      </View>
+        {/* Narration Card */}
+        <View style={styles.textCard}>
+          {words.length > 0 ? (
+            <HighlightedNarration
+              words={words}
+              currentWordIndex={currentWordIndex}
+            />
+          ) : (
+            <Text style={styles.fallbackText}>{narration}</Text>
+          )}
+        </View>
 
-      {/* BUTTONS */}
-      <View style={styles.buttonContainer}>
-        <TouchableOpacity
-          style={styles.guideButton}
-          onPress={handleLiveGuide}
-        >
-          <Text style={styles.guideButtonText}>Live Guide</Text>
-        </TouchableOpacity>
-        <TouchableOpacity
-          style={styles.secondaryButton}
-          onPress={() => router.push('/tour/history')}
-        >
-          <Text style={styles.secondaryButtonText}>{'\u{1F3DB}'} See Past</Text>
-        </TouchableOpacity>
-        <TouchableOpacity style={styles.nextButton} onPress={handleNextStop}>
-          <Text style={styles.nextButtonText}>
-            {isComplete ? 'Finish Tour' : `Next: ${nextStopData?.name ?? 'Stop'}`}
-          </Text>
-        </TouchableOpacity>
-      </View>
-    </View>
+        {/* Controls */}
+        <View style={styles.controlsContainer}>
+          {/* Audio visualizer placeholder */}
+          <View style={styles.visualizerRow}>
+            {Array.from({ length: 20 }).map((_, i) => (
+              <View
+                key={i}
+                style={[
+                  styles.visualizerBar,
+                  { height: 8 + Math.random() * 24 },
+                ]}
+              />
+            ))}
+          </View>
+
+          <View style={styles.buttonRow}>
+            <TouchableOpacity
+              style={styles.secondaryButton}
+              onPress={() => router.push('/tour/history')}
+            >
+              <Text style={styles.secondaryButtonText}>See Past</Text>
+            </TouchableOpacity>
+            <TouchableOpacity
+              style={styles.guideButton}
+              onPress={handleLiveGuide}
+            >
+              <Text style={styles.guideButtonIcon}>🎙️</Text>
+              <Text style={styles.guideButtonText}>Talk to Guide</Text>
+            </TouchableOpacity>
+          </View>
+
+          <TouchableOpacity
+            style={styles.nextButton}
+            onPress={handleNextStop}
+          >
+            <Text style={styles.nextButtonText}>
+              {isComplete ? 'Finish Tour' : `Next: ${nextStopData?.name ?? 'Stop'}`}
+            </Text>
+            <Text style={styles.nextArrow}>→</Text>
+          </TouchableOpacity>
+        </View>
+      </SafeAreaView>
+    </LinearGradient>
   )
 }
 
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: Colors.background,
+  },
+  safeArea: {
+    flex: 1,
   },
   loadingContainer: {
     flex: 1,
     justifyContent: 'center',
     alignItems: 'center',
-    backgroundColor: Colors.background,
+    padding: 32,
+  },
+  loadingCard: {
+    backgroundColor: 'rgba(255,255,255,0.10)',
+    borderRadius: 28,
+    borderWidth: 1,
+    borderColor: 'rgba(255,255,255,0.18)',
+    padding: 40,
+    alignItems: 'center',
   },
   loadingText: {
     fontSize: 16,
@@ -139,27 +194,50 @@ const styles = StyleSheet.create({
     marginTop: 16,
   },
 
-  // Top section — header
+  // Header
   headerSection: {
-    paddingTop: 16,
-    paddingBottom: 12,
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    paddingHorizontal: 16,
+    paddingVertical: 12,
+  },
+  backButton: {
+    backgroundColor: 'rgba(0,0,0,0.45)',
+    borderRadius: 999,
+    paddingHorizontal: 20,
+    paddingVertical: 12,
+    borderWidth: 1,
+    borderColor: 'rgba(255,255,255,0.3)',
+  },
+  backButtonText: {
+    color: '#FFFFFF',
+    fontSize: 15,
+    fontFamily: Fonts.semiBold,
+  },
+  headerCenter: {
     alignItems: 'center',
   },
-  stopName: {
-    fontSize: 22,
+  headerLabel: {
+    fontSize: 18,
     fontFamily: Fonts.bold,
     color: Colors.text,
-    textAlign: 'center',
+  },
+  headerSub: {
+    fontSize: 13,
+    fontFamily: Fonts.regular,
+    color: Colors.textSecondary,
+    marginTop: 2,
   },
 
-  // Middle section — text card
+  // Text card
   textCard: {
     flex: 1,
     marginHorizontal: 16,
-    backgroundColor: Colors.surface,
-    borderRadius: 20,
+    backgroundColor: 'rgba(255,255,255,0.08)',
+    borderRadius: 24,
     borderWidth: 1,
-    borderColor: Colors.border,
+    borderColor: 'rgba(255,255,255,0.15)',
     overflow: 'hidden',
   },
   fallbackText: {
@@ -170,44 +248,84 @@ const styles = StyleSheet.create({
     padding: 20,
   },
 
-  // Buttons
-  buttonContainer: {
+  // Controls
+  controlsContainer: {
     paddingHorizontal: 16,
-    paddingVertical: 8,
-    gap: 8,
+    paddingTop: 16,
     paddingBottom: 16,
   },
-  guideButton: {
-    backgroundColor: Colors.accent,
-    paddingVertical: 14,
-    borderRadius: 14,
-    alignItems: 'center',
+
+  // Visualizer
+  visualizerRow: {
+    flexDirection: 'row',
+    justifyContent: 'center',
+    alignItems: 'flex-end',
+    height: 40,
+    gap: 3,
+    marginBottom: 16,
   },
-  guideButtonText: {
-    color: '#000',
-    fontSize: 16,
-    fontFamily: Fonts.bold,
+  visualizerBar: {
+    width: 3,
+    backgroundColor: 'rgba(255,255,255,0.25)',
+    borderRadius: 2,
+  },
+
+  // Buttons
+  buttonRow: {
+    flexDirection: 'row',
+    gap: 10,
+    marginBottom: 10,
   },
   secondaryButton: {
-    backgroundColor: Colors.surfaceLight,
-    paddingVertical: 12,
-    borderRadius: 12,
+    flex: 1,
+    backgroundColor: 'rgba(255,255,255,0.10)',
+    paddingVertical: 14,
+    borderRadius: 999,
     alignItems: 'center',
+    borderWidth: 1,
+    borderColor: 'rgba(255,255,255,0.15)',
   },
   secondaryButtonText: {
     color: Colors.text,
     fontSize: 15,
     fontFamily: Fonts.semiBold,
   },
-  nextButton: {
-    backgroundColor: Colors.surfaceLight,
+  guideButton: {
+    flex: 1,
+    flexDirection: 'row',
+    backgroundColor: Colors.text,
     paddingVertical: 14,
-    borderRadius: 14,
+    borderRadius: 999,
     alignItems: 'center',
+    justifyContent: 'center',
+    gap: 8,
+  },
+  guideButtonIcon: {
+    fontSize: 16,
+  },
+  guideButtonText: {
+    color: '#000',
+    fontSize: 15,
+    fontFamily: Fonts.bold,
+  },
+  nextButton: {
+    flexDirection: 'row',
+    backgroundColor: 'rgba(255,255,255,0.08)',
+    paddingVertical: 14,
+    borderRadius: 999,
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: 8,
+    borderWidth: 1,
+    borderColor: 'rgba(255,255,255,0.12)',
   },
   nextButtonText: {
-    color: Colors.text,
+    color: Colors.textSecondary,
+    fontSize: 15,
+    fontFamily: Fonts.semiBold,
+  },
+  nextArrow: {
     fontSize: 16,
-    fontFamily: Fonts.bold,
+    color: Colors.textSecondary,
   },
 })

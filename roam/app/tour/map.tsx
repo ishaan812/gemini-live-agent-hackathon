@@ -1,5 +1,6 @@
 import React from 'react'
 import { StyleSheet, Text, TouchableOpacity, View } from 'react-native'
+import { SafeAreaView } from 'react-native-safe-area-context'
 import { useRouter } from 'expo-router'
 import { TourMapView } from '../../components/MapView'
 import { StopCard } from '../../components/StopCard'
@@ -37,10 +38,6 @@ export default function MapScreen() {
         )
       : null
 
-  const handleDevSkip = () => {
-    router.push('/tour/camera')
-  }
-
   return (
     <View style={styles.container}>
       <View style={styles.mapContainer}>
@@ -60,14 +57,26 @@ export default function MapScreen() {
         )}
       </View>
 
-      {__DEV__ && !isNearStop && currentStop && (
-        <TouchableOpacity
-          style={styles.devSkipButton}
-          onPress={handleDevSkip}
-        >
-          <Text style={styles.devSkipText}>Skip (Dev)</Text>
-        </TouchableOpacity>
-      )}
+      {/* Top bar */}
+      <SafeAreaView style={styles.topOverlay} pointerEvents="box-none">
+        <View style={styles.topRow} pointerEvents="box-none">
+          <TouchableOpacity
+            style={styles.pillButton}
+            onPress={() => router.back()}
+          >
+            <Text style={styles.pillButtonText}>‹ Back</Text>
+          </TouchableOpacity>
+
+          {!isNearStop && currentStop && (
+            <TouchableOpacity
+              style={styles.pillButton}
+              onPress={() => router.push('/tour/camera')}
+            >
+              <Text style={styles.pillButtonText}>Skip ›</Text>
+            </TouchableOpacity>
+          )}
+        </View>
+      </SafeAreaView>
 
       <View style={styles.bottomSheet}>
         {currentStop && (
@@ -119,19 +128,49 @@ const styles = StyleSheet.create({
     fontFamily: Fonts.regular,
     color: Colors.textSecondary,
   },
+
+  // Top bar
+  topOverlay: {
+    position: 'absolute',
+    top: 0,
+    left: 0,
+    right: 0,
+    zIndex: 10,
+  },
+  topRow: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    paddingHorizontal: 16,
+    paddingTop: 8,
+  },
+  pillButton: {
+    backgroundColor: 'rgba(0,0,0,0.55)',
+    borderRadius: 999,
+    paddingHorizontal: 20,
+    paddingVertical: 12,
+    borderWidth: 1,
+    borderColor: 'rgba(255,255,255,0.3)',
+  },
+  pillButtonText: {
+    color: '#FFFFFF',
+    fontSize: 15,
+    fontFamily: Fonts.semiBold,
+  },
+
+  // Bottom sheet
   bottomSheet: {
-    backgroundColor: Colors.primaryLight,
+    backgroundColor: 'rgba(15,32,39,0.92)',
     paddingVertical: 16,
-    borderTopLeftRadius: 20,
-    borderTopRightRadius: 20,
+    borderTopLeftRadius: 28,
+    borderTopRightRadius: 28,
     borderTopWidth: 1,
-    borderTopColor: Colors.border,
+    borderTopColor: 'rgba(255,255,255,0.15)',
   },
   verifyButton: {
-    backgroundColor: Colors.accent,
+    backgroundColor: Colors.text,
     marginHorizontal: 16,
     paddingVertical: 14,
-    borderRadius: 14,
+    borderRadius: 999,
     alignItems: 'center',
     marginTop: 8,
   },
@@ -147,20 +186,5 @@ const styles = StyleSheet.create({
     fontSize: 14,
     marginTop: 8,
     paddingBottom: 8,
-  },
-  devSkipButton: {
-    position: 'absolute',
-    top: 60,
-    right: 16,
-    backgroundColor: '#FF6B00',
-    paddingHorizontal: 14,
-    paddingVertical: 8,
-    borderRadius: 20,
-    zIndex: 999,
-  },
-  devSkipText: {
-    color: '#fff',
-    fontSize: 13,
-    fontFamily: Fonts.bold,
   },
 })

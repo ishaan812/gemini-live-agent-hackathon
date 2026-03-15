@@ -6,6 +6,7 @@ import {
   StyleSheet,
   View,
   Image,
+  Text,
   TouchableOpacity,
   StyleProp,
 } from 'react-native';
@@ -20,6 +21,7 @@ type ControlBarOptions = {
   onMicClick: () => void;
   isCameraEnabled: boolean;
   onCameraClick: () => void;
+  onFlipCameraClick?: () => void;
   isScreenShareEnabled: boolean;
   onScreenShareClick: () => void;
   isChatEnabled: boolean;
@@ -93,6 +95,15 @@ export default function ControlBar({ style = {}, options }: ControlBarProps) {
       >
         <Image style={styles.icon} source={cameraImage} />
       </TouchableOpacity>
+      {options.isCameraEnabled && options.onFlipCameraClick && (
+        <TouchableOpacity
+          style={[styles.button, styles.enabledButton]}
+          activeOpacity={0.7}
+          onPress={() => options.onFlipCameraClick!()}
+        >
+          <Text style={styles.flipIcon}>⟲</Text>
+        </TouchableOpacity>
+      )}
       <TouchableOpacity
         style={[
           styles.button,
@@ -150,6 +161,11 @@ const styles = StyleSheet.create({
   },
   icon: {
     width: 20,
+  },
+  flipIcon: {
+    color: '#CCCCCC',
+    fontSize: 20,
+    fontWeight: 'bold',
   },
   micVisualizer: {
     width: 20,

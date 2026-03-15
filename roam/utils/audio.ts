@@ -95,8 +95,10 @@ export function decodeBase64Chunks(chunks: string[]): Uint8Array {
 export function writeChunksToTempWav(
   chunks: string[],
   sampleRate: number = 24000,
-): string {
+): string | null {
   const pcmData = decodeBase64Chunks(chunks)
+  // Guard: skip empty or too-small audio data that iOS can't play
+  if (pcmData.length < 100) return null
   const wavBase64 = pcmBytesToWavBase64(pcmData, sampleRate)
   const fileName = `gemini-audio-${Date.now()}-${Math.random().toString(36).slice(2, 6)}.wav`
   const file = new File(Paths.cache, fileName)

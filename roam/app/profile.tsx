@@ -6,8 +6,10 @@ import {
   TouchableOpacity,
   View,
   ScrollView,
-  SafeAreaView,
 } from 'react-native'
+import { SafeAreaView } from 'react-native-safe-area-context'
+import { LinearGradient } from 'expo-linear-gradient'
+import { useRouter } from 'expo-router'
 import { Colors, Fonts } from '../constants/colors'
 import {
   useUserStore,
@@ -16,6 +18,7 @@ import {
 } from '../store/userStore'
 
 export default function ProfileScreen() {
+  const router = useRouter()
   const store = useUserStore()
   const [editName, setEditName] = useState(store.name)
 
@@ -24,91 +27,138 @@ export default function ProfileScreen() {
   }
 
   return (
-    <SafeAreaView style={styles.container}>
-      <ScrollView contentContainerStyle={styles.scroll}>
-        <View style={styles.avatarContainer}>
-          <View style={styles.avatar}>
-            <Text style={styles.avatarText}>
-              {store.name ? store.name[0].toUpperCase() : '?'}
-            </Text>
-          </View>
-        </View>
-
-        <Text style={styles.sectionTitle}>Name</Text>
-        <View style={styles.nameRow}>
-          <TextInput
-            style={styles.nameInput}
-            value={editName}
-            onChangeText={setEditName}
-            onBlur={handleNameSave}
-            placeholder="Your name"
-            placeholderTextColor={Colors.gray}
-          />
-        </View>
-
-        <Text style={styles.sectionTitle}>Narration Style</Text>
-        {NARRATION_STYLES.map((s) => (
+    <LinearGradient
+      colors={[Colors.gradientStart, Colors.gradientMid, Colors.gradientEnd]}
+      style={styles.gradient}
+    >
+      <SafeAreaView style={styles.container}>
+        <ScrollView contentContainerStyle={styles.scroll}>
+          {/* Back button */}
           <TouchableOpacity
-            key={s.value}
-            style={[
-              styles.optionCard,
-              store.narrationStyle === s.value && styles.optionCardSelected,
-            ]}
-            onPress={() => store.setNarrationStyle(s.value)}
+            style={styles.backButton}
+            onPress={() => router.back()}
           >
-            <Text style={[styles.optionLabel, store.narrationStyle === s.value && styles.optionLabelSelected]}>
-              {s.label}
-            </Text>
-            <Text style={styles.optionDesc}>{s.desc}</Text>
+            <Text style={styles.backButtonText}>‹ Back</Text>
           </TouchableOpacity>
-        ))}
 
-        <Text style={styles.sectionTitle}>Language</Text>
-        <View style={styles.langRow}>
-          {LANGUAGES.map((l) => (
-            <TouchableOpacity
-              key={l.value}
-              style={[
-                styles.langChip,
-                store.language === l.value && styles.langChipSelected,
-              ]}
-              onPress={() => store.setLanguage(l.value)}
-            >
-              <Text style={[styles.langText, store.language === l.value && styles.langTextSelected]}>
-                {l.native}
+          {/* Avatar */}
+          <View style={styles.avatarContainer}>
+            <View style={styles.avatar}>
+              <Text style={styles.avatarText}>
+                {store.name ? store.name[0].toUpperCase() : '?'}
               </Text>
+            </View>
+          </View>
+
+          {/* Name */}
+          <Text style={styles.sectionTitle}>Name</Text>
+          <View style={styles.nameRow}>
+            <TextInput
+              style={styles.nameInput}
+              value={editName}
+              onChangeText={setEditName}
+              onBlur={handleNameSave}
+              placeholder="Your name"
+              placeholderTextColor={Colors.textMuted}
+            />
+          </View>
+
+          {/* Narration Style */}
+          <Text style={styles.sectionTitle}>Narration Style</Text>
+          {NARRATION_STYLES.map((s) => (
+            <TouchableOpacity
+              key={s.value}
+              style={[
+                styles.optionCard,
+                store.narrationStyle === s.value && styles.optionCardSelected,
+              ]}
+              onPress={() => store.setNarrationStyle(s.value)}
+            >
+              <Text
+                style={[
+                  styles.optionLabel,
+                  store.narrationStyle === s.value && styles.optionLabelSelected,
+                ]}
+              >
+                {s.label}
+              </Text>
+              <Text style={styles.optionDesc}>{s.desc}</Text>
             </TouchableOpacity>
           ))}
-        </View>
 
-        {store.completedTours.length > 0 && (
-          <>
-            <Text style={styles.sectionTitle}>Trophies</Text>
-            {store.completedTours.map((tourId) => (
-              <View key={tourId} style={styles.trophyCard}>
-                <Text style={styles.trophyIcon}>🏆</Text>
-                <View>
-                  <Text style={styles.trophyName}>Colaba Explorer</Text>
-                  <Text style={styles.trophyDesc}>Completed {tourId}</Text>
-                </View>
-              </View>
+          {/* Language */}
+          <Text style={styles.sectionTitle}>Language</Text>
+          <View style={styles.langRow}>
+            {LANGUAGES.map((l) => (
+              <TouchableOpacity
+                key={l.value}
+                style={[
+                  styles.langChip,
+                  store.language === l.value && styles.langChipSelected,
+                ]}
+                onPress={() => store.setLanguage(l.value)}
+              >
+                <Text
+                  style={[
+                    styles.langText,
+                    store.language === l.value && styles.langTextSelected,
+                  ]}
+                >
+                  {l.native}
+                </Text>
+              </TouchableOpacity>
             ))}
-          </>
-        )}
-      </ScrollView>
-    </SafeAreaView>
+          </View>
+
+          {/* Trophies */}
+          {store.completedTours.length > 0 && (
+            <>
+              <Text style={styles.sectionTitle}>Trophies</Text>
+              {store.completedTours.map((tourId) => (
+                <View key={tourId} style={styles.trophyCard}>
+                  <Text style={styles.trophyIcon}>🏆</Text>
+                  <View>
+                    <Text style={styles.trophyName}>Colaba Explorer</Text>
+                    <Text style={styles.trophyDesc}>Completed {tourId}</Text>
+                  </View>
+                </View>
+              ))}
+            </>
+          )}
+        </ScrollView>
+      </SafeAreaView>
+    </LinearGradient>
   )
 }
 
 const styles = StyleSheet.create({
+  gradient: {
+    flex: 1,
+  },
   container: {
     flex: 1,
-    backgroundColor: Colors.background,
   },
   scroll: {
     padding: 24,
     paddingBottom: 60,
   },
+  backButton: {
+    alignSelf: 'flex-start',
+    backgroundColor: 'rgba(0,0,0,0.45)',
+    borderRadius: 999,
+    paddingHorizontal: 20,
+    paddingVertical: 12,
+    borderWidth: 1,
+    borderColor: 'rgba(255,255,255,0.3)',
+    marginBottom: 16,
+  },
+  backButtonText: {
+    color: '#FFFFFF',
+    fontSize: 15,
+    fontFamily: Fonts.semiBold,
+  },
+
+  // Avatar
   avatarContainer: {
     alignItems: 'center',
     marginBottom: 32,
@@ -117,15 +167,19 @@ const styles = StyleSheet.create({
     width: 80,
     height: 80,
     borderRadius: 40,
-    backgroundColor: Colors.accent,
+    backgroundColor: 'rgba(255,255,255,0.14)',
+    borderWidth: 1,
+    borderColor: 'rgba(255,255,255,0.25)',
     justifyContent: 'center',
     alignItems: 'center',
   },
   avatarText: {
     fontSize: 36,
-    fontFamily: Fonts.extraBold,
-    color: '#000',
+    fontFamily: Fonts.bold,
+    color: Colors.text,
   },
+
+  // Section
   sectionTitle: {
     fontSize: 13,
     fontFamily: Fonts.bold,
@@ -135,28 +189,32 @@ const styles = StyleSheet.create({
     marginTop: 24,
     marginBottom: 12,
   },
+
+  // Name
   nameRow: {
     flexDirection: 'row',
   },
   nameInput: {
     flex: 1,
-    backgroundColor: Colors.surface,
-    borderRadius: 14,
-    paddingHorizontal: 16,
+    backgroundColor: 'rgba(255,255,255,0.08)',
+    borderRadius: 999,
+    paddingHorizontal: 20,
     paddingVertical: 14,
     fontSize: 17,
     fontFamily: Fonts.regular,
     color: Colors.text,
     borderWidth: 1,
-    borderColor: Colors.border,
+    borderColor: 'rgba(255,255,255,0.15)',
   },
+
+  // Options
   optionCard: {
-    backgroundColor: Colors.surface,
-    borderRadius: 14,
+    backgroundColor: 'rgba(255,255,255,0.08)',
+    borderRadius: 20,
     padding: 16,
     marginBottom: 10,
-    borderWidth: 1.5,
-    borderColor: Colors.border,
+    borderWidth: 1,
+    borderColor: 'rgba(255,255,255,0.15)',
   },
   optionCardSelected: {
     borderColor: Colors.accent,
@@ -176,18 +234,20 @@ const styles = StyleSheet.create({
     fontFamily: Fonts.regular,
     color: Colors.textSecondary,
   },
+
+  // Language
   langRow: {
     flexDirection: 'row',
     flexWrap: 'wrap',
     gap: 10,
   },
   langChip: {
-    backgroundColor: Colors.surface,
-    borderRadius: 12,
-    paddingHorizontal: 18,
+    backgroundColor: 'rgba(255,255,255,0.08)',
+    borderRadius: 999,
+    paddingHorizontal: 20,
     paddingVertical: 12,
-    borderWidth: 1.5,
-    borderColor: Colors.border,
+    borderWidth: 1,
+    borderColor: 'rgba(255,255,255,0.15)',
   },
   langChipSelected: {
     borderColor: Colors.accent,
@@ -201,11 +261,13 @@ const styles = StyleSheet.create({
   langTextSelected: {
     color: Colors.accent,
   },
+
+  // Trophies
   trophyCard: {
     flexDirection: 'row',
     alignItems: 'center',
-    backgroundColor: Colors.surface,
-    borderRadius: 14,
+    backgroundColor: 'rgba(255,255,255,0.08)',
+    borderRadius: 20,
     padding: 16,
     gap: 14,
     borderWidth: 1,

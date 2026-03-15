@@ -15,7 +15,7 @@ export const aiAlpha = new GoogleGenAI({
 const MODEL = 'gemini-2.5-flash'
 export const LIVE_MODEL = 'gemini-2.5-flash-native-audio-preview-12-2025'
 
-export const VOICE_NAME = 'Aoede'
+export const VOICE_NAME = 'Charon'
 
 export const LIVE_SPEECH_CONFIG = {
   voiceConfig: {
@@ -199,7 +199,7 @@ Start by warmly greeting ${ctx.name} and sharing something captivating about whe
 }
 
 /**
- * Generate narration audio using the same Live API + Aoede voice as the guide.
+ * Generate narration audio using the same Live API + Charon voice as the guide.
  * Opens a short-lived live session, sends the text, collects audio, closes.
  */
 export async function generateNarrationAudio(text: string): Promise<string | null> {

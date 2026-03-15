@@ -133,6 +133,7 @@ export function useNarrationPlayback() {
     try {
       // Decode each base64 chunk individually to avoid padding corruption
       const fileUri = writeChunksToTempWav(chunks, 24000)
+      if (!fileUri) return // Skip empty/too-small audio chunks
       audioQueueRef.current.push(fileUri)
       totalAudioChunksReceivedRef.current += 1
 

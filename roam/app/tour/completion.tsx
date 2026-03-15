@@ -4,8 +4,9 @@ import {
   Text,
   TouchableOpacity,
   View,
-  SafeAreaView,
 } from 'react-native'
+import { SafeAreaView } from 'react-native-safe-area-context'
+import { LinearGradient } from 'expo-linear-gradient'
 import { useRouter } from 'expo-router'
 import { useTour } from '../../hooks/useTour'
 import { useUserStore } from '../../store/userStore'
@@ -24,34 +25,43 @@ export default function CompletionScreen() {
   }
 
   return (
-    <SafeAreaView style={styles.container}>
-      <View style={styles.content}>
-        <Text style={styles.celebration} accessible={false}>🎉</Text>
-        <Text style={styles.title}>Tour Complete!</Text>
-        <Text style={styles.subtitle}>
-          You explored the Colaba Heritage Walk
-        </Text>
-
-        <View style={styles.badge}>
-          <Text style={styles.badgeIcon} accessible={false}>🏆</Text>
-          <Text style={styles.badgeName}>Colaba Explorer</Text>
-          <Text style={styles.badgeDescription}>
-            Completed all 5 heritage stops
+    <LinearGradient
+      colors={[Colors.gradientStart, Colors.gradientMid, Colors.gradientEnd]}
+      style={styles.gradient}
+    >
+      <SafeAreaView style={styles.container}>
+        <View style={styles.content}>
+          <View style={styles.celebrationCircle}>
+            <Text style={styles.celebration} accessible={false}>🎉</Text>
+          </View>
+          <Text style={styles.title}>Tour Complete!</Text>
+          <Text style={styles.subtitle}>
+            You explored the Colaba Heritage Walk
           </Text>
-        </View>
 
-        <TouchableOpacity style={styles.homeButton} onPress={handleReturnHome}>
-          <Text style={styles.homeButtonText}>Return Home</Text>
-        </TouchableOpacity>
-      </View>
-    </SafeAreaView>
+          <View style={styles.badge}>
+            <Text style={styles.badgeIcon} accessible={false}>🏆</Text>
+            <Text style={styles.badgeName}>Colaba Explorer</Text>
+            <Text style={styles.badgeDescription}>
+              Completed all 5 heritage stops
+            </Text>
+          </View>
+
+          <TouchableOpacity style={styles.homeButton} onPress={handleReturnHome}>
+            <Text style={styles.homeButtonText}>Return Home</Text>
+          </TouchableOpacity>
+        </View>
+      </SafeAreaView>
+    </LinearGradient>
   )
 }
 
 const styles = StyleSheet.create({
+  gradient: {
+    flex: 1,
+  },
   container: {
     flex: 1,
-    backgroundColor: Colors.background,
   },
   content: {
     flex: 1,
@@ -59,13 +69,23 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     padding: 32,
   },
+  celebrationCircle: {
+    width: 100,
+    height: 100,
+    borderRadius: 50,
+    backgroundColor: 'rgba(255,255,255,0.10)',
+    borderWidth: 1,
+    borderColor: 'rgba(255,255,255,0.18)',
+    justifyContent: 'center',
+    alignItems: 'center',
+    marginBottom: 24,
+  },
   celebration: {
-    fontSize: 80,
-    marginBottom: 16,
+    fontSize: 48,
   },
   title: {
-    fontSize: 36,
-    fontFamily: Fonts.extraBold,
+    fontSize: 32,
+    fontFamily: Fonts.bold,
     color: Colors.text,
     marginBottom: 8,
   },
@@ -76,8 +96,8 @@ const styles = StyleSheet.create({
     marginBottom: 40,
   },
   badge: {
-    backgroundColor: Colors.surface,
-    borderRadius: 20,
+    backgroundColor: 'rgba(255,255,255,0.10)',
+    borderRadius: 28,
     padding: 32,
     alignItems: 'center',
     width: '100%',
@@ -101,10 +121,10 @@ const styles = StyleSheet.create({
     color: Colors.textSecondary,
   },
   homeButton: {
-    backgroundColor: Colors.accent,
+    backgroundColor: Colors.text,
     paddingVertical: 16,
     paddingHorizontal: 48,
-    borderRadius: 14,
+    borderRadius: 999,
   },
   homeButtonText: {
     color: '#000',

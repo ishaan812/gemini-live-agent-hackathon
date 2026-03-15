@@ -7,15 +7,20 @@ import {
   ActivityIndicator,
   Image,
   Dimensions,
+  TouchableOpacity,
 } from 'react-native'
+import { SafeAreaView } from 'react-native-safe-area-context'
+import { LinearGradient } from 'expo-linear-gradient'
+import { useRouter } from 'expo-router'
 import { useTour } from '../../hooks/useTour'
 import { generateHistoryImage } from '../../services/geminiService'
 import { Colors, Fonts } from '../../constants/colors'
 
 const { width: SCREEN_WIDTH } = Dimensions.get('window')
-const IMAGE_WIDTH = SCREEN_WIDTH - 40
+const IMAGE_WIDTH = SCREEN_WIDTH - 48
 
 export default function HistoryScreen() {
+  const router = useRouter()
   const { currentStop } = useTour()
   const [description, setDescription] = useState<string>('')
   const [loading, setLoading] = useState(true)
@@ -51,63 +56,111 @@ export default function HistoryScreen() {
 
   if (loading) {
     return (
-      <View style={styles.loadingContainer}>
-        <ActivityIndicator size="large" color={Colors.accent} />
-        <Text style={styles.loadingText}>Traveling back in time...</Text>
-      </View>
+      <LinearGradient
+        colors={[Colors.gradientStart, Colors.gradientMid, Colors.gradientEnd]}
+        style={styles.loadingContainer}
+      >
+        <View style={styles.loadingCard}>
+          <ActivityIndicator size="large" color={Colors.accent} />
+          <Text style={styles.loadingText}>Traveling back in time...</Text>
+        </View>
+      </LinearGradient>
     )
   }
 
   return (
-    <ScrollView style={styles.container} contentContainerStyle={styles.content}>
-      <Text style={styles.title}>{currentStop?.name}</Text>
-      <Text style={styles.subtitle}>A Glimpse into the Past</Text>
+    <LinearGradient
+      colors={[Colors.gradientStart, Colors.gradientMid, Colors.gradientEnd]}
+      style={styles.container}
+    >
+      <SafeAreaView style={{ flex: 1 }}>
+        <TouchableOpacity
+          style={styles.backButton}
+          onPress={() => router.back()}
+        >
+          <Text style={styles.backButtonText}>‹ Back</Text>
+        </TouchableOpacity>
+        <ScrollView
+          style={styles.scrollView}
+          contentContainerStyle={styles.content}
+        >
+          <Text style={styles.title}>{currentStop?.name}</Text>
+        <Text style={styles.subtitle}>A Glimpse into the Past</Text>
 
-      {images.length > 0 ? (
-        <View style={styles.imageContainer}>
-          <Image
-            source={{ uri: images[currentImageIndex] }}
-            style={styles.image}
-            resizeMode="cover"
-          />
-          {images.length > 1 && (
-            <View style={styles.dotsRow}>
-              {images.map((_, i) => (
-                <View
-                  key={i}
-                  style={[styles.dot, i === currentImageIndex && styles.dotActive]}
-                />
-              ))}
-            </View>
-          )}
-          <Text style={styles.imageNote}>Historical photographs</Text>
-        </View>
-      ) : (
-        <View style={styles.placeholderContainer}>
-          <Text style={styles.imagePlaceholder}>🏛️</Text>
-          <Text style={styles.imageNote}>Historical Reconstruction</Text>
-        </View>
-      )}
+        {images.length > 0 ? (
+          <View style={styles.imageContainer}>
+            <Image
+              source={{ uri: images[currentImageIndex] }}
+              style={styles.image}
+              resizeMode="cover"
+            />
+            {images.length > 1 && (
+              <View style={styles.dotsRow}>
+                {images.map((_, i) => (
+                  <View
+                    key={i}
+                    style={[styles.dot, i === currentImageIndex && styles.dotActive]}
+                  />
+                ))}
+              </View>
+            )}
+            <Text style={styles.imageNote}>Historical photographs</Text>
+          </View>
+        ) : (
+          <View style={styles.placeholderContainer}>
+            <Text style={styles.imagePlaceholder}>🏛️</Text>
+            <Text style={styles.imageNote}>Historical Reconstruction</Text>
+          </View>
+        )}
 
-      <Text style={styles.description}>{description}</Text>
-    </ScrollView>
+        <View style={styles.descriptionCard}>
+          <Text style={styles.description}>{description}</Text>
+        </View>
+      </ScrollView>
+      </SafeAreaView>
+    </LinearGradient>
   )
 }
 
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: Colors.background,
+  },
+  backButton: {
+    alignSelf: 'flex-start',
+    backgroundColor: 'rgba(0,0,0,0.45)',
+    borderRadius: 999,
+    paddingHorizontal: 20,
+    paddingVertical: 12,
+    borderWidth: 1,
+    borderColor: 'rgba(255,255,255,0.3)',
+    marginLeft: 16,
+    marginTop: 8,
+  },
+  backButtonText: {
+    color: '#FFFFFF',
+    fontSize: 15,
+    fontFamily: Fonts.semiBold,
+  },
+  scrollView: {
+    flex: 1,
   },
   content: {
-    padding: 20,
+    padding: 24,
     paddingBottom: 40,
   },
   loadingContainer: {
     flex: 1,
     justifyContent: 'center',
     alignItems: 'center',
-    backgroundColor: Colors.background,
+  },
+  loadingCard: {
+    backgroundColor: 'rgba(255,255,255,0.10)',
+    borderRadius: 28,
+    borderWidth: 1,
+    borderColor: 'rgba(255,255,255,0.18)',
+    padding: 40,
+    alignItems: 'center',
   },
   loadingText: {
     fontSize: 16,
@@ -117,7 +170,7 @@ const styles = StyleSheet.create({
   },
   title: {
     fontSize: 28,
-    fontFamily: Fonts.extraBold,
+    fontFamily: Fonts.bold,
     color: Colors.text,
     textAlign: 'center',
   },
@@ -130,12 +183,12 @@ const styles = StyleSheet.create({
     marginBottom: 24,
   },
   imageContainer: {
-    borderRadius: 16,
+    borderRadius: 24,
     overflow: 'hidden',
-    marginBottom: 24,
-    backgroundColor: Colors.surface,
+    marginBottom: 20,
+    backgroundColor: 'rgba(255,255,255,0.08)',
     borderWidth: 1,
-    borderColor: Colors.border,
+    borderColor: 'rgba(255,255,255,0.15)',
   },
   image: {
     width: IMAGE_WIDTH,
@@ -151,30 +204,37 @@ const styles = StyleSheet.create({
     width: 6,
     height: 6,
     borderRadius: 3,
-    backgroundColor: Colors.gray,
+    backgroundColor: 'rgba(255,255,255,0.3)',
   },
   dotActive: {
-    backgroundColor: Colors.accent,
+    backgroundColor: Colors.text,
     width: 18,
   },
   imageNote: {
-    color: Colors.gray,
+    color: Colors.textMuted,
     fontSize: 12,
     fontFamily: Fonts.regular,
     textAlign: 'center',
     paddingBottom: 10,
   },
   placeholderContainer: {
-    backgroundColor: Colors.surface,
-    borderRadius: 16,
+    backgroundColor: 'rgba(255,255,255,0.08)',
+    borderRadius: 24,
     padding: 40,
     alignItems: 'center',
-    marginBottom: 24,
+    marginBottom: 20,
     borderWidth: 1,
-    borderColor: Colors.border,
+    borderColor: 'rgba(255,255,255,0.15)',
   },
   imagePlaceholder: {
     fontSize: 80,
+  },
+  descriptionCard: {
+    backgroundColor: 'rgba(255,255,255,0.08)',
+    borderRadius: 24,
+    borderWidth: 1,
+    borderColor: 'rgba(255,255,255,0.15)',
+    padding: 20,
   },
   description: {
     fontSize: 16,
