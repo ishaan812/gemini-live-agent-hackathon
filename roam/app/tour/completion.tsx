@@ -11,15 +11,17 @@ import { useRouter } from 'expo-router'
 import { useTour } from '../../hooks/useTour'
 import { useUserStore } from '../../store/userStore'
 import { Colors, Fonts } from '../../constants/colors'
-import { COLABA_TOUR } from '../../constants/config'
+import { useHiddenGems } from '../../hooks/useHiddenGems'
 
 export default function CompletionScreen() {
   const router = useRouter()
-  const { resetTour } = useTour()
+  const { resetTour, tourId } = useTour()
   const addCompletedTour = useUserStore((s) => s.addCompletedTour)
+  const { totalDiscovered, totalGems } = useHiddenGems()
+  const allGemsFound = totalDiscovered === totalGems && totalGems > 0
 
   function handleReturnHome() {
-    addCompletedTour(COLABA_TOUR.id)
+    if (tourId) addCompletedTour(tourId)
     resetTour()
     router.replace('/')
   }
@@ -46,6 +48,20 @@ export default function CompletionScreen() {
               Completed all 5 heritage stops
             </Text>
           </View>
+
+          {totalGems > 0 && (
+            <View style={[styles.badge, allGemsFound && styles.badgeGold]}>
+              <Text style={styles.badgeIcon} accessible={false}>💎</Text>
+              <Text style={styles.badgeName}>
+                {allGemsFound ? 'Eagle Eye' : 'Hidden Gems'}
+              </Text>
+              <Text style={styles.badgeDescription}>
+                {allGemsFound
+                  ? `Found all ${totalGems} hidden gems!`
+                  : `Discovered ${totalDiscovered} of ${totalGems} hidden gems`}
+              </Text>
+            </View>
+          )}
 
           <TouchableOpacity style={styles.homeButton} onPress={handleReturnHome}>
             <Text style={styles.homeButtonText}>Return Home</Text>
@@ -119,6 +135,9 @@ const styles = StyleSheet.create({
     fontSize: 14,
     fontFamily: Fonts.regular,
     color: Colors.textSecondary,
+  },
+  badgeGold: {
+    borderColor: '#FFD700',
   },
   homeButton: {
     backgroundColor: Colors.text,

@@ -3,31 +3,23 @@ import { Config } from '../constants/config'
 import { Stop } from '../types/stop'
 import { useUserStore } from '../store/userStore'
 
-// Standard client for text generation
+// Standard client for text generation and TTS
 export const ai = new GoogleGenAI({ apiKey: Config.GEMINI_API_KEY })
 
-// v1alpha client — still used for narration audio (TTS via Live API)
-export const aiAlpha = new GoogleGenAI({
-  apiKey: Config.GEMINI_API_KEY,
-  apiVersion: 'v1alpha',
-})
-
 const MODEL = 'gemini-2.5-flash'
-export const LIVE_MODEL = 'gemini-2.5-flash-native-audio-preview-12-2025'
+const TTS_MODEL = 'gemini-2.5-flash-preview-tts'
 
 export const VOICE_NAME = 'Charon'
-
-export const LIVE_SPEECH_CONFIG = {
-  voiceConfig: {
-    prebuiltVoiceConfig: { voiceName: VOICE_NAME },
-  },
-}
 
 const LANG_MAP: Record<string, string> = {
   en: 'English',
   hi: 'Hindi',
-  mr: 'Marathi',
-  gu: 'Gujarati',
+  es: 'Spanish',
+  fr: 'French',
+  ar: 'Arabic',
+  pt: 'Portuguese',
+  ja: 'Japanese',
+  de: 'German',
 }
 
 const STYLE_MAP: Record<string, string> = {
@@ -97,11 +89,10 @@ export async function generateNarration(stop: Stop, nextStop?: Stop | null): Pro
 Your style: ${ctx.style}.
 Narrate in ${ctx.language}.
 
-Give an engaging narration (3-4 paragraphs) about "${stop.name}".
+Give an engaging narration (under 120 words, max 700 characters) about "${stop.name}".
 ${stop.description}
 
-Include interesting historical facts, cultural significance, and fascinating stories.
-Write naturally with human-like warmth — include pauses (use "..." for dramatic pauses), emotional exclamations, and vivid sensory details. Make the tourist FEEL like they're standing in history.
+Include one interesting historical fact. Be warm and vivid.
 ${nextStopHint}`,
     })
 
@@ -175,7 +166,7 @@ You are speaking to ${ctx.name}.
 
 PERSONALITY & VOICE:
 - Your style: ${ctx.style}
-- Speak in ${ctx.language}
+- You MUST speak entirely in ${ctx.language}. Every word you say must be in ${ctx.language}. Do not switch to any other language unless the user explicitly asks you to.
 - You have a warm, feminine energy — think of a passionate local friend who LOVES showing people around
 - Express genuine excitement, wonder, awe, and tenderness in your voice
 - Use natural pauses, breaths, and emotional inflections — laugh when something is funny, whisper when sharing secrets
@@ -199,81 +190,65 @@ Start by warmly greeting ${ctx.name} and sharing something captivating about whe
 }
 
 /**
- * Generate narration audio using the same Live API + Charon voice as the guide.
- * Opens a short-lived live session, sends the text, collects audio, closes.
+ * Generate narration audio using Gemini 2.5 TTS.
+ * Splits long text into chunks to avoid API hangs on large input.
+ * Returns concatenated PCM audio as base64.
  */
-export async function generateNarrationAudio(text: string): Promise<string | null> {
-  const ctx = getUserContext()
-  return new Promise((resolve) => {
-    const chunks: string[] = []
-    let resolved = false
+// In-memory cache: stopId -> { audioBase64, narrationText }
+const ttsCache = new Map<string, { audioBase64: string; text: string }>()
 
-    const timeout = setTimeout(() => {
-      if (!resolved) {
-        resolved = true
-        resolve(chunks.length > 0 ? chunks.join('') : null)
-      }
-    }, 30000)
+export function getCachedTTS(stopId: string): { audioBase64: string; text: string } | null {
+  return ttsCache.get(stopId) ?? null
+}
 
-    aiAlpha.live.connect({
-      model: LIVE_MODEL,
-      config: {
-        responseModalities: [Modality.AUDIO],
-        speechConfig: LIVE_SPEECH_CONFIG,
-        systemInstruction: {
-          parts: [{
-            text: `You are Roam, a warm expressive narrator. Read the following text aloud with emotion, dramatic flair, and natural pauses. Speak in ${ctx.language}. Your style: ${ctx.style}. Do NOT add any extra commentary — just narrate the text beautifully.`,
-          }],
-        },
-      },
-      callbacks: {
-        onopen: () => {},
-        onmessage: (message: any) => {
-          const content = message.serverContent
-          if (!content) return
+const TTS_CONFIG = {
+  responseModalities: [Modality.AUDIO] as any,
+  speechConfig: {
+    voiceConfig: {
+      prebuiltVoiceConfig: { voiceName: VOICE_NAME },
+    },
+  },
+}
 
-          if (content.modelTurn?.parts) {
-            for (const part of content.modelTurn.parts) {
-              if (part.inlineData?.data) {
-                chunks.push(part.inlineData.data)
-              }
-            }
-          }
+export async function generateNarrationTTS(
+  text: string,
+  stopId?: string,
+): Promise<{ audioBase64: string } | null> {
+  // Check cache first
+  if (stopId) {
+    const cached = ttsCache.get(stopId)
+    if (cached && cached.text === text) {
+      console.log('[TTS] Cache hit for stop:', stopId)
+      return { audioBase64: cached.audioBase64 }
+    }
+  }
 
-          if (content.turnComplete) {
-            if (!resolved) {
-              resolved = true
-              clearTimeout(timeout)
-              resolve(chunks.length > 0 ? chunks.join('') : null)
-            }
-          }
-        },
-        onerror: () => {
-          if (!resolved) {
-            resolved = true
-            clearTimeout(timeout)
-            resolve(null)
-          }
-        },
-        onclose: () => {
-          if (!resolved) {
-            resolved = true
-            clearTimeout(timeout)
-            resolve(chunks.length > 0 ? chunks.join('') : null)
-          }
-        },
-      },
-    }).then((session) => {
-      // Send the narration text to be spoken
-      session.sendClientContent({
-        turns: [{ role: 'user', parts: [{ text }] }],
+  for (let attempt = 1; attempt <= 3; attempt++) {
+    try {
+      console.log(`[TTS] Attempt ${attempt}/3, text length: ${text.length}`)
+      const response = await ai.models.generateContent({
+        model: TTS_MODEL,
+        contents: [{ parts: [{ text }] }],
+        config: TTS_CONFIG,
       })
-    }).catch(() => {
-      if (!resolved) {
-        resolved = true
-        clearTimeout(timeout)
-        resolve(null)
+
+      const data = response.candidates?.[0]?.content?.parts?.[0]?.inlineData?.data
+      if (data) {
+        console.log('[TTS] Audio received:', data.length, 'chars')
+        if (stopId) {
+          ttsCache.set(stopId, { audioBase64: data, text })
+        }
+        return { audioBase64: data }
       }
-    })
-  })
+      console.warn('[TTS] No audio data in response')
+    } catch (e: any) {
+      console.warn(`[TTS] Attempt ${attempt} failed:`, e?.message || e)
+      if (attempt < 3) {
+        await new Promise(r => setTimeout(r, 1000 * attempt))
+      }
+    }
+  }
+
+  console.error('[TTS] All attempts failed')
+  return null
 }

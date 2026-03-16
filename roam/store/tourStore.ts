@@ -1,11 +1,23 @@
 import { create } from 'zustand'
 import { Stop } from '../types/stop'
 
+interface TourMeta {
+  id: string
+  name: string
+  description: string
+  distance: string
+  duration?: string
+  image?: string
+  about?: string
+}
+
 interface TourState {
   tourId: string | null
+  tourMeta: TourMeta | null
   stops: Stop[]
   currentStopIndex: number
   completedStops: string[]
+  setTour: (meta: TourMeta, stops: Stop[]) => void
   setStops: (stops: Stop[]) => void
   nextStop: () => void
   goToStop: (index: number) => void
@@ -16,9 +28,19 @@ interface TourState {
 
 export const useTourStore = create<TourState>((set, get) => ({
   tourId: null,
+  tourMeta: null,
   stops: [],
   currentStopIndex: 0,
   completedStops: [],
+
+  setTour: (meta, stops) =>
+    set({
+      tourId: meta.id,
+      tourMeta: meta,
+      stops,
+      currentStopIndex: 0,
+      completedStops: [],
+    }),
 
   setStops: (stops) => set({ stops, currentStopIndex: 0, completedStops: [] }),
 
@@ -44,7 +66,8 @@ export const useTourStore = create<TourState>((set, get) => ({
     }
   },
 
-  resetTour: () => set({ tourId: null, stops: [], currentStopIndex: 0, completedStops: [] }),
+  resetTour: () =>
+    set({ tourId: null, tourMeta: null, stops: [], currentStopIndex: 0, completedStops: [] }),
 
   isComplete: () => {
     const { stops, completedStops } = get()

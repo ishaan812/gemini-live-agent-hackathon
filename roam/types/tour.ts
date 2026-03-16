@@ -5,6 +5,9 @@ export interface Tour {
   name: string
   description: string
   distance: string
+  duration?: string
+  image?: string
+  about?: string
   stops: Stop[]
 }
 

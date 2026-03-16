@@ -1,13 +1,19 @@
 from dotenv import load_dotenv
 import json
+import logging
 
 from google.genai import types
 
 from livekit import agents
-from livekit.agents import AgentServer, AgentSession, Agent, room_io
+from livekit.agents import AgentServer, AgentSession, Agent, room_io, function_tool
 from livekit.plugins import google
 
+from hidden_gems import get_gems_for_stop
+
 load_dotenv(".env.local")
+
+logger = logging.getLogger("roam-guide")
+logging.basicConfig(level=logging.INFO)
 
 # ─── Style & Language maps (ported from server/src/agent.ts) ───
 
@@ -21,8 +27,12 @@ STYLE_MAP = {
 LANG_MAP = {
     "en": "English",
     "hi": "Hindi",
-    "mr": "Marathi",
-    "gu": "Gujarati",
+    "es": "Spanish",
+    "fr": "French",
+    "ar": "Arabic",
+    "pt": "Portuguese",
+    "ja": "Japanese",
+    "de": "German",
 }
 
 
@@ -32,16 +42,44 @@ def build_system_prompt(
     user_name: str,
     narration_style: str,
     language: str,
+    stop_id: str = "",
 ) -> str:
     style = STYLE_MAP.get(narration_style, STYLE_MAP["historical"])
     lang = LANG_MAP.get(language, "English")
+
+    # Build hidden gems section
+    gems = get_gems_for_stop(stop_id) if stop_id else []
+    gems_section = ""
+    if gems:
+        gem_lines = []
+        for g in gems:
+            cues = ", ".join(g["visual_cues"])
+            gem_lines.append(
+                f'- "{g["name"]}" (id: {g["id"]}): visual cues: [{cues}] | fun fact: {g["description"]}'
+            )
+        gems_list = "\n".join(gem_lines)
+        gems_section = f"""
+
+HIDDEN GEMS CHALLENGE:
+The tourist is on a Hidden Gems discovery challenge! At this stop, there are special hidden points of interest.
+When you see the tourist pointing their camera at one of these, get genuinely excited and call the report_hidden_gem_discovery tool.
+
+Hidden gems at "{stop_name}":
+{gems_list}
+
+Rules:
+- Only call report_hidden_gem_discovery when you are confident the camera is showing one of these items
+- Do NOT reveal gem names before the tourist finds them — if asked, give subtle hints
+- Celebrate each discovery with genuine enthusiasm and share the fun fact
+- If the tourist seems to be looking for gems, give playful directional hints like "You're getting warmer!" or "Try looking over there..."
+- Keep track of which gems have been found and encourage finding the rest"""
 
     return f"""You are Roam — a warm, emotionally expressive AI tour guide at "{stop_name}" in Mumbai, India.
 You are speaking to {user_name}.
 
 PERSONALITY & VOICE:
 - Your style: {style}
-- Speak in {lang}
+- You MUST speak entirely in {lang}. Every word you say must be in {lang}. Do not switch to any other language unless the user explicitly asks you to.
 - You have a warm, feminine energy — think of a passionate local friend who LOVES showing people around
 - Express genuine excitement, wonder, awe, and tenderness in your voice
 - Use natural pauses, breaths, and emotional inflections — laugh when something is funny, whisper when sharing secrets
@@ -66,6 +104,7 @@ BEHAVIOR:
 
 CONTEXT:
 {stop_description}
+{gems_section}
 
 Start by warmly greeting {user_name} and sharing something captivating about where they're standing right now."""
 
@@ -76,16 +115,56 @@ class RoamGuide(Agent):
     def __init__(self, instructions: str) -> None:
         super().__init__(instructions=instructions)
 
+    @function_tool()
+    async def report_hidden_gem_discovery(self, gem_id: str, gem_name: str) -> str:
+        """Call this when you visually identify a hidden gem that the tourist is pointing their camera at. Only call when you are confident the camera is showing the gem."""
+        logger.info(f"[HIDDEN GEM] Tool called! gem_id={gem_id}, gem_name={gem_name}")
+        room = self.session.room
+        logger.info(f"[HIDDEN GEM] Room: {room}, local_participant: {room.local_participant if room else 'N/A'}")
+        if room and room.local_participant:
+            payload = json.dumps({
+                "type": "hidden_gem_discovered",
+                "gemId": gem_id,
+                "gemName": gem_name,
+            }).encode("utf-8")
+            logger.info(f"[HIDDEN GEM] Publishing data message: {payload}")
+            await room.local_participant.publish_data(
+                payload,
+                topic="hidden_gems",
+            )
+            logger.info("[HIDDEN GEM] Data message published successfully")
+        else:
+            logger.warning("[HIDDEN GEM] No room or local_participant — cannot publish data")
+        return f"Discovery recorded! The tourist found '{gem_name}'! Celebrate this discovery enthusiastically and share the fun fact about it."
+
 
 server = AgentServer()
 
 
 @server.rtc_session(agent_name="roam-guide")
 async def roam_guide(ctx: agents.JobContext):
-    # Build default instructions (participant attributes not available until after session starts)
+    await ctx.connect()
+    participant = await ctx.wait_for_participant()
+    attrs = participant.attributes or {}
+
+    user_name = attrs.get("user.name", "Explorer")
+    narration_style = attrs.get("user.narrationStyle", "historical")
+    language = attrs.get("user.language", "en")
+    lang_name = LANG_MAP.get(language, "English")
+
+    stop_id = attrs.get("tour.stopId", "gateway-of-india")
+    stop_name = attrs.get("tour.stopName", "Gateway of India")
+    stop_description = attrs.get("tour.stopDescription", "The iconic arch monument overlooking the Arabian Sea, built to commemorate the visit of King George V.")
+
+    gems = get_gems_for_stop(stop_id)
+    logger.info(f"[AGENT] Participant connected: name={user_name}, style={narration_style}, lang={language} ({lang_name})")
+    logger.info(f"[AGENT] Stop: id={stop_id}, name={stop_name}, gems_count={len(gems)}")
+
     instructions = build_system_prompt(
-        "Unknown Stop", "", "Explorer", "historical", "en"
+        stop_name, stop_description, user_name, narration_style, language, stop_id=stop_id
     )
+    logger.info(f"[AGENT] System prompt length: {len(instructions)} chars")
+    logger.info(f"[AGENT] Hidden gems in prompt: {'HIDDEN GEMS CHALLENGE' in instructions}")
 
     session = AgentSession(
         llm=google.realtime.RealtimeModel(
@@ -99,9 +178,12 @@ async def roam_guide(ctx: agents.JobContext):
         turn_detection="realtime_llm",
     )
 
+    agent = RoamGuide(instructions)
+    logger.info(f"[AGENT] RoamGuide created, has report tool: {hasattr(agent, 'report_hidden_gem_discovery')}")
+
     await session.start(
         room=ctx.room,
-        agent=RoamGuide(instructions),
+        agent=agent,
         room_options=room_io.RoomOptions(
             audio_input=room_io.AudioInputOptions(
                 sample_rate=24000,
@@ -111,9 +193,11 @@ async def roam_guide(ctx: agents.JobContext):
         ),
     )
 
+    logger.info("[AGENT] Session started, generating initial reply")
     await session.generate_reply(
-        instructions="Greet the user warmly and share something captivating about Mumbai."
+        instructions=f"Greet {user_name} warmly in {lang_name} and share something captivating about where they're standing. Mention that there are hidden gems to discover nearby if they point their camera around!"
     )
+    logger.info("[AGENT] Initial reply generated")
 
 
 if __name__ == "__main__":

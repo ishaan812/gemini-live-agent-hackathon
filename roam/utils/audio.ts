@@ -50,6 +50,59 @@ function uint8ArrayToBase64(bytes: Uint8Array): string {
   return result
 }
 
+function writeStr(view: DataView, offset: number, str: string) {
+  for (let i = 0; i < str.length; i++) {
+    view.setUint8(offset + i, str.charCodeAt(i))
+  }
+}
+
+/**
+ * Write raw PCM base64 audio to a temp WAV file and return the file URI.
+ * Gemini TTS returns raw PCM (16-bit, 24kHz, mono).
+ * Writes the Uint8Array directly to avoid slow base64 re-encoding.
+ */
+export function writePcmToTempWav(
+  pcmBase64: string,
+  sampleRate: number = 24000,
+): string {
+  console.log('[Audio] Decoding base64 PCM, length:', pcmBase64.length)
+  const pcmData = base64ToUint8Array(pcmBase64)
+  console.log('[Audio] PCM decoded, bytes:', pcmData.length)
+
+  const pcmLength = pcmData.length
+  const wavLength = 44 + pcmLength
+  const buffer = new ArrayBuffer(wavLength)
+  const view = new DataView(buffer)
+  const uint8 = new Uint8Array(buffer)
+
+  const channels = 1
+  const bitsPerSample = 16
+  const byteRate = sampleRate * channels * (bitsPerSample / 8)
+  const blockAlign = channels * (bitsPerSample / 8)
+
+  writeStr(view, 0, 'RIFF')
+  view.setUint32(4, wavLength - 8, true)
+  writeStr(view, 8, 'WAVE')
+  writeStr(view, 12, 'fmt ')
+  view.setUint32(16, 16, true)
+  view.setUint16(20, 1, true)
+  view.setUint16(22, channels, true)
+  view.setUint32(24, sampleRate, true)
+  view.setUint32(28, byteRate, true)
+  view.setUint16(32, blockAlign, true)
+  view.setUint16(34, bitsPerSample, true)
+  writeStr(view, 36, 'data')
+  view.setUint32(40, pcmLength, true)
+  uint8.set(pcmData, 44)
+
+  // Write Uint8Array directly - no base64 re-encoding needed
+  const fileName = `tts-audio-${Date.now()}.wav`
+  const file = new File(Paths.cache, fileName)
+  file.write(uint8)
+  console.log('[Audio] WAV written:', file.uri, 'size:', wavLength)
+  return file.uri
+}
+
 /**
  * Strip WAV/RIFF header from base64-encoded audio if present.
  * The recorder produces WAV files (44-byte header) but Gemini expects raw PCM.
@@ -71,126 +124,3 @@ export function stripWavHeaderFromBase64(base64: string): string {
   return base64
 }
 
-/**
- * Decode an array of base64 chunks to a single Uint8Array.
- * Fixes the bug where .join('') on base64 strings with padding produces
- * invalid base64 (e.g. "AAAA==BBBB==" has padding in the middle).
- */
-export function decodeBase64Chunks(chunks: string[]): Uint8Array {
-  const decoded = chunks.map((c) => base64ToUint8Array(c))
-  const totalLength = decoded.reduce((sum, arr) => sum + arr.length, 0)
-  const result = new Uint8Array(totalLength)
-  let offset = 0
-  for (const arr of decoded) {
-    result.set(arr, offset)
-    offset += arr.length
-  }
-  return result
-}
-
-/**
- * Write an array of PCM base64 chunks to a temp WAV file.
- * Decodes each chunk individually to avoid base64 padding corruption.
- */
-export function writeChunksToTempWav(
-  chunks: string[],
-  sampleRate: number = 24000,
-): string | null {
-  const pcmData = decodeBase64Chunks(chunks)
-  // Guard: skip empty or too-small audio data that iOS can't play
-  if (pcmData.length < 100) return null
-  const wavBase64 = pcmBytesToWavBase64(pcmData, sampleRate)
-  const fileName = `gemini-audio-${Date.now()}-${Math.random().toString(36).slice(2, 6)}.wav`
-  const file = new File(Paths.cache, fileName)
-  file.write(wavBase64, { encoding: 'base64' })
-  return file.uri
-}
-
-/**
- * Convert raw PCM bytes directly to WAV base64.
- */
-function pcmBytesToWavBase64(pcmData: Uint8Array, sampleRate: number): string {
-  const pcmLength = pcmData.length
-  const wavLength = 44 + pcmLength
-  const buffer = new ArrayBuffer(wavLength)
-  const view = new DataView(buffer)
-  const uint8 = new Uint8Array(buffer)
-
-  const channels = 1
-  const bitsPerSample = 16
-  const byteRate = sampleRate * channels * (bitsPerSample / 8)
-  const blockAlign = channels * (bitsPerSample / 8)
-
-  writeStr(view, 0, 'RIFF')
-  view.setUint32(4, wavLength - 8, true)
-  writeStr(view, 8, 'WAVE')
-  writeStr(view, 12, 'fmt ')
-  view.setUint32(16, 16, true)
-  view.setUint16(20, 1, true)
-  view.setUint16(22, channels, true)
-  view.setUint32(24, sampleRate, true)
-  view.setUint32(28, byteRate, true)
-  view.setUint16(32, blockAlign, true)
-  view.setUint16(34, bitsPerSample, true)
-  writeStr(view, 36, 'data')
-  view.setUint32(40, pcmLength, true)
-  uint8.set(pcmData, 44)
-
-  return uint8ArrayToBase64(uint8)
-}
-
-/**
- * Convert raw PCM base64 to WAV base64 (Hermes-safe, no atob/btoa/spread).
- */
-export function pcmToWavBase64(pcmBase64: string, sampleRate: number = 24000): string {
-  const pcmData = base64ToUint8Array(pcmBase64)
-  const pcmLength = pcmData.length
-  const wavLength = 44 + pcmLength
-  const buffer = new ArrayBuffer(wavLength)
-  const view = new DataView(buffer)
-  const uint8 = new Uint8Array(buffer)
-
-  const channels = 1
-  const bitsPerSample = 16
-  const byteRate = sampleRate * channels * (bitsPerSample / 8)
-  const blockAlign = channels * (bitsPerSample / 8)
-
-  writeStr(view, 0, 'RIFF')
-  view.setUint32(4, wavLength - 8, true)
-  writeStr(view, 8, 'WAVE')
-  writeStr(view, 12, 'fmt ')
-  view.setUint32(16, 16, true)
-  view.setUint16(20, 1, true)
-  view.setUint16(22, channels, true)
-  view.setUint32(24, sampleRate, true)
-  view.setUint32(28, byteRate, true)
-  view.setUint16(32, blockAlign, true)
-  view.setUint16(34, bitsPerSample, true)
-  writeStr(view, 36, 'data')
-  view.setUint32(40, pcmLength, true)
-
-  // Copy PCM data after header
-  uint8.set(pcmData, 44)
-
-  return uint8ArrayToBase64(uint8)
-}
-
-/**
- * Write PCM base64 audio to a temp WAV file and return the file URI.
- */
-export function writePcmToTempWav(
-  pcmBase64: string,
-  sampleRate: number = 24000,
-): string {
-  const wavBase64 = pcmToWavBase64(pcmBase64, sampleRate)
-  const fileName = `gemini-audio-${Date.now()}.wav`
-  const file = new File(Paths.cache, fileName)
-  file.write(wavBase64, { encoding: 'base64' })
-  return file.uri
-}
-
-function writeStr(view: DataView, offset: number, str: string) {
-  for (let i = 0; i < str.length; i++) {
-    view.setUint8(offset + i, str.charCodeAt(i))
-  }
-}

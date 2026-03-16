@@ -1,70 +1,70 @@
 /**
- * Word-level sync utilities for matching Live API outputTranscription
- * against the original narration text.
+ * Word-level sync utilities for narration playback.
  */
-
-function normalize(word: string): string {
-  // Strip all punctuation, lowercase, collapse whitespace
-  return word
-    .toLowerCase()
-    .replace(/[^\p{L}\p{N}]/gu, '')  // Keep letters and numbers from any script
-}
 
 export function splitWords(text: string): string[] {
   return text.split(/\s+/).filter((w) => w.length > 0)
 }
 
+export interface WordTimestamp {
+  word: string
+  timeSeconds: number
+}
+
 /**
- * Given the current word index, the full word list, and an incoming
- * transcription chunk, advance the index by greedy forward-matching.
- *
- * For each transcribed word, look ahead up to `lookahead` positions
- * in `words` from `currentIndex` for a match. If no exact match,
- * try startsWith for partial matches (model may truncate words).
+ * Estimate word-level timestamps based on total audio duration.
+ * Words are weighted by character length; punctuation-ending words
+ * get extra weight to account for natural pauses.
  */
-export function advanceWordIndex(
-  currentIndex: number,
+export function estimateWordTimestamps(
   words: string[],
-  transcriptionChunk: string,
-  lookahead: number = 12,
+  durationSeconds: number,
+): WordTimestamp[] {
+  if (words.length === 0) return []
+
+  // Weight each word: base = character count, bonus for pause-inducing punctuation
+  const weights = words.map((w) => {
+    let weight = w.length
+    if (/[.!?]$/.test(w)) weight += 3    // sentence-ending pause
+    else if (/[,;:]$/.test(w)) weight += 1.5  // clause pause
+    if (w.includes('...')) weight += 2    // dramatic pause
+    return weight
+  })
+
+  const totalWeight = weights.reduce((sum, w) => sum + w, 0)
+
+  const timestamps: WordTimestamp[] = []
+  let cumulativeTime = 0
+
+  for (let i = 0; i < words.length; i++) {
+    timestamps.push({ word: words[i], timeSeconds: cumulativeTime })
+    cumulativeTime += (weights[i] / totalWeight) * durationSeconds
+  }
+
+  return timestamps
+}
+
+/**
+ * Binary search to find the word index at a given playback time.
+ */
+export function findWordIndexAtTime(
+  timestamps: WordTimestamp[],
+  currentTime: number,
 ): number {
-  const transcribedWords = transcriptionChunk.split(/\s+/).filter((w) => w.length > 0)
-  let idx = currentIndex
+  if (timestamps.length === 0) return 0
 
-  for (const tw of transcribedWords) {
-    const normTw = normalize(tw)
-    if (!normTw || normTw.length < 2) continue  // Skip very short fragments
+  let lo = 0
+  let hi = timestamps.length - 1
 
-    const searchEnd = Math.min(idx + lookahead, words.length)
-    let matched = false
-
-    // First pass: exact match
-    for (let j = idx; j < searchEnd; j++) {
-      const normWord = normalize(words[j])
-      if (normWord === normTw) {
-        idx = j + 1
-        matched = true
-        break
-      }
-    }
-
-    // Second pass: prefix match (model might say partial word)
-    if (!matched && normTw.length >= 3) {
-      for (let j = idx; j < searchEnd; j++) {
-        const normWord = normalize(words[j])
-        if (normWord.startsWith(normTw) || normTw.startsWith(normWord)) {
-          idx = j + 1
-          matched = true
-          break
-        }
-      }
-    }
-
-    // If no match found, just advance by 1 to keep progress moving
-    if (!matched && idx < words.length) {
-      idx = Math.min(idx + 1, words.length)
+  while (lo <= hi) {
+    const mid = (lo + hi) >>> 1
+    if (timestamps[mid].timeSeconds <= currentTime) {
+      lo = mid + 1
+    } else {
+      hi = mid - 1
     }
   }
 
-  return idx
+  // hi is now the index of the last timestamp <= currentTime
+  return Math.max(0, hi)
 }

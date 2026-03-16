@@ -13,8 +13,9 @@ import { SafeAreaView } from 'react-native-safe-area-context'
 import { LinearGradient } from 'expo-linear-gradient'
 import { useRouter } from 'expo-router'
 import { Colors, Fonts } from '../constants/colors'
-import { COLABA_TOUR } from '../constants/config'
+import { COLABA_TOUR, getTourById } from '../constants/config'
 import { useUserStore } from '../store/userStore'
+import { useTourStore } from '../store/tourStore'
 
 const { width: SCREEN_WIDTH } = Dimensions.get('window')
 
@@ -48,7 +49,7 @@ const POPULAR_TOURS = [
     category: 'heritage',
   },
   {
-    id: 'street-food',
+    id: 'mumbai-street-eats',
     name: 'Mumbai Street Eats',
     location: 'Mohammad Ali Road',
     distance: '1.2 km',
@@ -71,9 +72,9 @@ const POPULAR_TOURS = [
 
 const NEARBY_EXPERIENCES = [
   {
-    id: 'dharavi',
-    name: 'Dharavi Craft Tour',
-    subtitle: 'Explore local artisans',
+    id: 'dharavi-art-walk',
+    name: 'Dharavi Art Walk',
+    subtitle: 'Explore local artisans & street art',
     rating: '4.8',
     image: 'https://images.unsplash.com/photo-1595658658481-d53d3f999875?w=400',
   },
@@ -98,8 +99,31 @@ export default function HomeScreen() {
   const name = useUserStore((s) => s.name)
   const [selectedCategory, setSelectedCategory] = useState<string | null>(null)
 
+  const setTour = useTourStore((s) => s.setTour)
+
   const handleUnavailable = () => {
     Alert.alert('Coming Soon', 'This tour is not available yet. Stay tuned!')
+  }
+
+  const navigateToTour = (tourId: string) => {
+    const tour = getTourById(tourId)
+    if (tour) {
+      setTour(
+        {
+          id: tour.id,
+          name: tour.name,
+          description: tour.description,
+          distance: tour.distance,
+          duration: tour.duration,
+          image: tour.image,
+          about: tour.about,
+        },
+        tour.stops,
+      )
+      router.push('/tour/overview')
+    } else {
+      handleUnavailable()
+    }
   }
 
   return (
@@ -114,9 +138,16 @@ export default function HomeScreen() {
         >
           {/* Header */}
           <View style={styles.header}>
-            <View>
-              <Text style={styles.greetingSmall}>Good Morning</Text>
-              <Text style={styles.userName}>{name || 'Explorer'}</Text>
+            <View style={styles.headerLeft}>
+              <Image
+                source={require('../assets/logo.png')}
+                style={styles.headerLogo}
+                resizeMode="contain"
+              />
+              <View>
+                <Text style={styles.greetingSmall}>Good Morning</Text>
+                <Text style={styles.userName}>{name || 'Explorer'}</Text>
+              </View>
             </View>
             <TouchableOpacity
               style={styles.profileButton}
@@ -148,7 +179,7 @@ export default function HomeScreen() {
           <TouchableOpacity
             style={styles.featuredCard}
             activeOpacity={0.85}
-            onPress={() => router.push('/tour/overview')}
+            onPress={() => navigateToTour(COLABA_TOUR.id)}
           >
             <Image
               source={{ uri: 'https://images.unsplash.com/photo-1570168007204-dfb528c6958f?w=800' }}
@@ -235,7 +266,7 @@ export default function HomeScreen() {
                 key={tour.id}
                 style={styles.tourMiniCard}
                 activeOpacity={0.8}
-                onPress={handleUnavailable}
+                onPress={() => navigateToTour(tour.id)}
               >
                 <Image
                   source={{ uri: tour.image }}
@@ -272,7 +303,7 @@ export default function HomeScreen() {
               key={exp.id}
               style={styles.experienceCard}
               activeOpacity={0.8}
-              onPress={handleUnavailable}
+              onPress={() => navigateToTour(exp.id)}
             >
               <Image
                 source={{ uri: exp.image }}
@@ -339,6 +370,15 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     paddingTop: 12,
     marginBottom: 8,
+  },
+  headerLeft: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 10,
+  },
+  headerLogo: {
+    width: 40,
+    height: 40,
   },
   greetingSmall: {
     fontSize: 14,

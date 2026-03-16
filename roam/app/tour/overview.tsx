@@ -13,13 +13,12 @@ import { LinearGradient } from 'expo-linear-gradient'
 import { useRouter } from 'expo-router'
 import { useTour } from '../../hooks/useTour'
 import { Colors, Fonts } from '../../constants/colors'
-import { COLABA_TOUR } from '../../constants/config'
 
 const { width: SCREEN_WIDTH } = Dimensions.get('window')
 
 export default function TourOverviewScreen() {
   const router = useRouter()
-  const { stops, completedStops, currentStopIndex, isComplete, goToStop } = useTour()
+  const { stops, tourMeta, completedStops, currentStopIndex, isComplete, goToStop } = useTour()
 
   const handleStopPress = (index: number) => {
     goToStop(index)
@@ -31,7 +30,7 @@ export default function TourOverviewScreen() {
       {/* Hero Image */}
       <View style={styles.heroContainer}>
         <Image
-          source={{ uri: 'https://images.unsplash.com/photo-1570168007204-dfb528c6958f?w=800' }}
+          source={{ uri: tourMeta?.image || 'https://images.unsplash.com/photo-1570168007204-dfb528c6958f?w=800' }}
           style={styles.heroImage}
           resizeMode="cover"
         />
@@ -59,16 +58,12 @@ export default function TourOverviewScreen() {
           contentContainerStyle={styles.scrollContent}
         >
           {/* Tour Title */}
-          <Text style={styles.tourName}>{COLABA_TOUR.name}</Text>
+          <Text style={styles.tourName}>{tourMeta?.name || 'Tour'}</Text>
 
           {/* Stat Pills */}
           <View style={styles.statsRow}>
             <View style={styles.statPill}>
-              <Text style={styles.statValue}>1.8K</Text>
-              <Text style={styles.statLabel}>Visitors</Text>
-            </View>
-            <View style={styles.statPill}>
-              <Text style={styles.statValue}>{COLABA_TOUR.distance}</Text>
+              <Text style={styles.statValue}>{tourMeta?.distance || '—'}</Text>
               <Text style={styles.statLabel}>Distance</Text>
             </View>
             <View style={styles.statPill}>
@@ -81,10 +76,7 @@ export default function TourOverviewScreen() {
           <View style={styles.glassCard}>
             <Text style={styles.cardTitle}>About the Tour</Text>
             <Text style={styles.cardBody}>
-              Walk through the historic Colaba district, from the majestic Gateway of India to the
-              cultural heart of Kala Ghoda. Experience colonial-era architecture, bustling markets,
-              and hidden gems along the way. Each stop is verified with AI-powered landmark
-              recognition and narrated by your personal guide.
+              {tourMeta?.about || tourMeta?.description || ''}
             </Text>
           </View>
 

@@ -9,11 +9,14 @@ import { useTour } from '../../hooks/useTour'
 import { isWithinThreshold, getDistanceMeters } from '../../utils/distance'
 import { Colors, Fonts } from '../../constants/colors'
 import { Config } from '../../constants/config'
+import { useHiddenGems } from '../../hooks/useHiddenGems'
+import { HiddenGemBadge } from '../../components/HiddenGemBadge'
 
 export default function MapScreen() {
   const router = useRouter()
   const location = useLocation()
   const { stops, currentStop, currentStopIndex, completedStops } = useTour()
+  const { discoveredCountForStop, totalCountForStop, gemsForStop, discoveredForStop } = useHiddenGems(currentStop?.id)
 
   const isNearStop =
     currentStop && !location.loading
@@ -48,6 +51,8 @@ export default function MapScreen() {
             completedStops={completedStops}
             userLatitude={location.latitude}
             userLongitude={location.longitude}
+            hiddenGems={gemsForStop}
+            discoveredGemIds={discoveredForStop.map((g) => g.id)}
           />
         )}
         {location.loading && (
@@ -89,6 +94,7 @@ export default function MapScreen() {
                 distanceToStop !== null ? `${distanceToStop}m away` : undefined
               }
             />
+            <HiddenGemBadge discovered={discoveredCountForStop} total={totalCountForStop} />
             {isNearStop && (
               <TouchableOpacity
                 style={styles.verifyButton}

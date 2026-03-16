@@ -2,7 +2,7 @@ import React, { useState, useEffect, useRef } from 'react'
 import { StyleSheet, Text, TouchableOpacity, View, ActivityIndicator } from 'react-native'
 import { createAudioPlayer, setAudioModeAsync, AudioPlayer as ExpoAudioPlayer } from 'expo-audio'
 import { Colors, Fonts } from '../constants/colors'
-import { generateNarrationAudio } from '../services/geminiService'
+import { generateNarrationTTS } from '../services/geminiService'
 import { writePcmToTempWav } from '../utils/audio'
 
 interface Props {
@@ -23,10 +23,9 @@ export function AudioPlayer({ text }: Props) {
       setLoading(true)
       setError(false)
       try {
-        const audioData = await generateNarrationAudio(text)
-        if (!cancelled && audioData) {
-          const fileUri = writePcmToTempWav(audioData, 24000)
-          geminiFileRef.current = fileUri
+        const result = await generateNarrationTTS(text)
+        if (!cancelled && result) {
+          geminiFileRef.current = writePcmToTempWav(result.audioBase64, 24000)
         } else if (!cancelled) {
           setError(true)
         }

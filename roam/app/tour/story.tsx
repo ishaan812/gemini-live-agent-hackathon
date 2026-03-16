@@ -28,23 +28,33 @@ export default function StoryScreen() {
   const nextStopData = currentStopIndex < stops.length - 1 ? stops[currentStopIndex + 1] : null
 
   const {
+    status: narrationStatus,
     currentWordIndex,
     words,
+    progress,
     start: startNarration,
     pause: pauseNarration,
+    resume: resumeNarration,
     stop: stopNarration,
   } = useNarrationPlayback()
 
-  // Generate narration text on mount
+  // Generate narration text + TTS audio, stay on loading screen until both are ready
   useEffect(() => {
     let cancelled = false
     async function loadNarration() {
       if (!currentStop) return
       setMode('loading')
+
+      // Step 1: Generate narration text
       const text = await generateNarration(currentStop, nextStopData)
       if (cancelled) return
       setNarration(text)
-      startNarration(text)
+
+      // Step 2: Generate TTS audio (blocks until audio is ready)
+      await startNarration(text, currentStop.id)
+      if (cancelled) return
+
+      // Step 3: Only now show the narrating screen
       setMode('narrating')
     }
     loadNarration()
@@ -71,7 +81,7 @@ export default function StoryScreen() {
     }
   }, [isComplete, nextStop, router, stopNarration])
 
-  if (mode === 'loading' && !narration) {
+  if (mode === 'loading') {
     return (
       <LinearGradient
         colors={[Colors.gradientStart, Colors.gradientMid, Colors.gradientEnd]}
@@ -122,17 +132,24 @@ export default function StoryScreen() {
 
         {/* Controls */}
         <View style={styles.controlsContainer}>
-          {/* Audio visualizer placeholder */}
-          <View style={styles.visualizerRow}>
-            {Array.from({ length: 20 }).map((_, i) => (
-              <View
-                key={i}
-                style={[
-                  styles.visualizerBar,
-                  { height: 8 + Math.random() * 24 },
-                ]}
-              />
-            ))}
+          {/* Progress bar + pause/play/replay */}
+          <View style={styles.playbackRow}>
+            <TouchableOpacity
+              style={styles.playPauseButton}
+              onPress={() => {
+                if (narrationStatus === 'playing') pauseNarration()
+                else if (narrationStatus === 'paused') resumeNarration()
+                else if (narrationStatus === 'idle' && words.length > 0) startNarration(narration, currentStop?.id)
+              }}
+              disabled={narrationStatus === 'loading'}
+            >
+              <Text style={styles.playPauseIcon}>
+                {narrationStatus === 'playing' ? '\u23F8' : narrationStatus === 'idle' && words.length > 0 ? '\u21BA' : '\u25B6'}
+              </Text>
+            </TouchableOpacity>
+            <View style={styles.progressBarContainer}>
+              <View style={[styles.progressBarFill, { width: `${Math.round(progress * 100)}%` }]} />
+            </View>
           </View>
 
           <View style={styles.buttonRow}>
@@ -255,18 +272,37 @@ const styles = StyleSheet.create({
     paddingBottom: 16,
   },
 
-  // Visualizer
-  visualizerRow: {
+  // Playback controls
+  playbackRow: {
     flexDirection: 'row',
-    justifyContent: 'center',
-    alignItems: 'flex-end',
-    height: 40,
-    gap: 3,
+    alignItems: 'center',
+    gap: 12,
     marginBottom: 16,
   },
-  visualizerBar: {
-    width: 3,
-    backgroundColor: 'rgba(255,255,255,0.25)',
+  playPauseButton: {
+    width: 40,
+    height: 40,
+    borderRadius: 20,
+    backgroundColor: 'rgba(255,255,255,0.15)',
+    alignItems: 'center',
+    justifyContent: 'center',
+    borderWidth: 1,
+    borderColor: 'rgba(255,255,255,0.25)',
+  },
+  playPauseIcon: {
+    fontSize: 16,
+    color: '#FFFFFF',
+  },
+  progressBarContainer: {
+    flex: 1,
+    height: 4,
+    backgroundColor: 'rgba(255,255,255,0.15)',
+    borderRadius: 2,
+    overflow: 'hidden',
+  },
+  progressBarFill: {
+    height: '100%',
+    backgroundColor: Colors.accent,
     borderRadius: 2,
   },
 
